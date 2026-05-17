@@ -16,6 +16,7 @@ from ibl_mcp.client import (
 from ibl_mcp.local_explorer import LocalIBLExplorer
 from ibl_mcp.services import IBLDomainService
 from ibl_mcp.storage import MCPStorage
+from neurodata_literature import LiteratureService, build_dataset_explorer_html, stable_variable_id
 
 
 def build_server() -> FastMCP:
@@ -33,6 +34,7 @@ def build_server() -> FastMCP:
     client = _client_from_env()
     service = IBLDomainService(client)
     local = LocalIBLExplorer(client.storage)
+    literature = LiteratureService(client.storage, "ibl")
 
     @mcp.tool()
     def get_storage_info() -> dict[str, Any]:
@@ -480,6 +482,150 @@ def build_server() -> FastMCP:
         return service.get_related_papers(query=query, project=project, dataset_type=dataset_type)
 
     @mcp.tool()
+    def get_dataset_papers(dataset_id: str, include_session_context: bool = True) -> dict[str, Any]:
+        """Infer IBL publications associated with a concrete Alyx dataset record."""
+        return service.get_dataset_papers(dataset_id, include_session_context=include_session_context)
+
+    @mcp.tool()
+    def resolve_dataset_papers(
+        dataset_id: str,
+        version_or_tag: str = "latest",
+        include_citation_graph: bool = False,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        """Resolve IBL dataset/session paper links through real public literature APIs."""
+        del version_or_tag, include_citation_graph
+        return literature.resolve_papers(
+            dataset_id,
+            _ibl_paper_hints(service, dataset_id),
+            limit=limit,
+            relationship="dataset",
+        )
+
+    @mcp.tool()
+    def query_dataset_papers(
+        dataset_id: str,
+        question: str,
+        version_or_tag: str = "latest",
+        full_text_policy: str = "auto",
+        limit: int = 8,
+    ) -> dict[str, Any]:
+        """Query IBL-associated papers and escalate to full text when uncertainty is high."""
+        del version_or_tag
+        context = _safe_call(lambda: client.get_dataset(dataset_id), default={})
+        return literature.query_papers(
+            dataset_id=dataset_id,
+            question=question,
+            paper_hints=_ibl_paper_hints(service, dataset_id),
+            dataset_context=context,
+            full_text_policy=full_text_policy,
+            limit=limit,
+        )
+
+    @mcp.tool()
+    def explain_dataset_variable(
+        dataset_key_or_id: str,
+        variable: str,
+        file_path: str | None = None,
+        object_path: str | None = None,
+        context: str | None = None,
+        version_or_tag: str = "latest",
+        full_text_policy: str = "auto",
+    ) -> dict[str, Any]:
+        """Explain an IBL/ALF variable using metadata, papers, and uncertainty-aware full text."""
+        del object_path, version_or_tag
+        variable_context = _ibl_variable_context(
+            local,
+            client,
+            dataset_key_or_id,
+            variable,
+            file_path=file_path,
+            context=context,
+        )
+        return literature.explain_variable(
+            dataset_id=dataset_key_or_id,
+            variable=variable,
+            variable_context=variable_context,
+            paper_hints=_ibl_paper_hints(service, dataset_key_or_id),
+            full_text_policy=full_text_policy,
+        )
+
+    @mcp.tool()
+    def register_paper_pdf(
+        dataset_id: str,
+        pdf_path: str,
+        doi: str | None = None,
+        title: str | None = None,
+    ) -> dict[str, Any]:
+        """Register a user-provided PDF for an IBL dataset/session and index it for future explanations."""
+        return literature.register_pdf(dataset_id=dataset_id, pdf_path=pdf_path, doi=doi, title=title)
+
+    @mcp.tool()
+    def list_missing_paper_pdfs(dataset_id: str) -> dict[str, Any]:
+        """List papers whose PDFs were needed but could not be retrieved automatically."""
+        return literature.list_missing_pdfs(dataset_id)
+
+    @mcp.tool()
+    def generate_dataset_explorer(
+        dataset_key_or_id: str,
+        version_or_tag: str = "latest",
+        include_papers: bool = True,
+    ) -> dict[str, Any]:
+        """Generate a static HTML explorer for an IBL/ALF dataset and its variables."""
+        del version_or_tag
+        summary, variables = _ibl_explorer_data(local, client, dataset_key_or_id)
+        papers = (
+            literature.resolve_papers(dataset_key_or_id, _ibl_paper_hints(service, dataset_key_or_id)).get("papers", [])
+            if include_papers
+            else []
+        )
+        explorer_id = stable_variable_id(dataset_key_or_id, {"kind": "explorer"}, "dataset")
+        artifact_dir = client.storage.config.provider_dir / "artifacts" / dataset_key_or_id.replace("/", "_").replace(":", "_")
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        html_path = artifact_dir / "dataset-explorer.html"
+        html_path.write_text(
+            build_dataset_explorer_html(
+                provider="ibl",
+                dataset_id=dataset_key_or_id,
+                title=str(summary.get("name") or summary.get("session_id") or dataset_key_or_id),
+                summary=summary,
+                variables=variables,
+                papers=papers,
+                missing_pdfs=literature.list_missing_pdfs(dataset_key_or_id).get("missing_pdfs", []),
+            ),
+            encoding="utf-8",
+        )
+        result = {
+            "status": "created",
+            "explorer_id": explorer_id,
+            "dataset_key_or_id": dataset_key_or_id,
+            "html_path": str(html_path),
+            "summary": {
+                "variable_count": len(variables),
+                "paper_count": len(papers),
+                "missing_pdf_count": len(literature.list_missing_pdfs(dataset_key_or_id).get("missing_pdfs", [])),
+            },
+        }
+        client.storage.upsert_record("dataset_explorer", explorer_id, result, source="neurodata_literature")
+        return result
+
+    @mcp.tool()
+    def explain_visual_dataset_selection(
+        explorer_id: str,
+        variable_id: str,
+        question: str | None = None,
+        full_text_policy: str = "auto",
+    ) -> dict[str, Any]:
+        """Return guidance for explaining a variable selected in a generated IBL explorer."""
+        return {
+            "explorer_id": explorer_id,
+            "variable_id": variable_id,
+            "question": question,
+            "next_action": "Call explain_dataset_variable with the dataset/session id, variable name, and file_path shown in the explorer row.",
+            "full_text_policy": full_text_policy,
+        }
+
+    @mcp.tool()
     def get_associated_code(query: str = "", project: str = "") -> dict[str, Any]:
         """Return IBL code repositories associated with publications/projects/topics."""
         return service.get_associated_code(query=query, project=project)
@@ -653,6 +799,90 @@ def _client_from_env() -> IBLClient:
         storage=storage,
     )
     return IBLClient(config)
+
+
+def _safe_call(call: Any, default: Any = None) -> Any:
+    try:
+        return call()
+    except Exception:
+        return default
+
+
+def _ibl_paper_hints(service: IBLDomainService, dataset_id: str) -> list[Any]:
+    hints: list[Any] = []
+    related = _safe_call(lambda: service.get_dataset_papers(dataset_id), default={})
+    data = related.get("data", related) if isinstance(related, dict) else {}
+    hints.extend(data.get("papers", []) if isinstance(data, dict) else [])
+    hints.extend([data.get("project"), data.get("dataset_type"), data.get("query_terms")] if isinstance(data, dict) else [])
+    if not hints:
+        fallback = _safe_call(lambda: service.get_related_papers(query=dataset_id), default={})
+        fallback_data = fallback.get("data", fallback) if isinstance(fallback, dict) else {}
+        hints.extend(fallback_data.get("papers", []) if isinstance(fallback_data, dict) else [])
+    return [hint for hint in hints if hint]
+
+
+def _ibl_variable_context(
+    local: LocalIBLExplorer,
+    client: IBLClient,
+    dataset_key_or_id: str,
+    variable: str,
+    *,
+    file_path: str | None,
+    context: str | None,
+) -> dict[str, Any]:
+    ctx: dict[str, Any] = {
+        "provider": "ibl",
+        "dataset_id": dataset_key_or_id,
+        "variable": variable,
+        "file_path": file_path,
+        "user_context": context,
+    }
+    inventory = _safe_call(lambda: local.signal_inventory(dataset_key_or_id), default={})
+    for signal in inventory.get("signals", []) if isinstance(inventory, dict) else []:
+        text = " ".join(str(signal.get(key, "")) for key in ["file", "collection", "alf_object", "alf_attribute", "modality"])
+        if (file_path and signal.get("file") == file_path) or variable.lower() in text.lower():
+            ctx.update(signal)
+            ctx["kind"] = "alf_variable"
+            return ctx
+    dataset = _safe_call(lambda: client.get_dataset(dataset_key_or_id), default={})
+    if dataset:
+        ctx.update(
+            {
+                "name": dataset.get("name"),
+                "collection": dataset.get("collection"),
+                "dataset_type": dataset.get("dataset_type"),
+                "session": dataset.get("session"),
+            }
+        )
+    return ctx
+
+
+def _ibl_explorer_data(
+    local: LocalIBLExplorer,
+    client: IBLClient,
+    dataset_key_or_id: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    summary = _safe_call(lambda: local.summarize(dataset_key_or_id), default={})
+    variables = []
+    inventory = _safe_call(lambda: local.signal_inventory(dataset_key_or_id), default={})
+    for signal in inventory.get("signals", []) if isinstance(inventory, dict) else []:
+        name = ".".join(part for part in [signal.get("alf_object"), signal.get("alf_attribute")] if part)
+        variables.append({"provider": "ibl", "name": name, "confidence_label": "low", **signal})
+    if not summary:
+        dataset = _safe_call(lambda: client.get_dataset(dataset_key_or_id), default={})
+        summary = dataset or {"name": dataset_key_or_id}
+        if dataset:
+            variables.append(
+                {
+                    "provider": "ibl",
+                    "kind": "alyx_dataset",
+                    "name": dataset.get("name") or dataset_key_or_id,
+                    "collection": dataset.get("collection"),
+                    "dataset_type": dataset.get("dataset_type"),
+                    "confidence_label": "low",
+                }
+            )
+    return summary, variables
 
 
 mcp = build_server()

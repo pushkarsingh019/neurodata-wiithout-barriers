@@ -14,6 +14,8 @@ Use the IBL MCP when you need to:
 - Register local IBL/ALF-style downloads.
 - Build a local index over subjects, sessions, collections, ALF objects, attributes, and modalities.
 - Generate local dataset reports.
+- Explain ALF variables with uncertainty-aware evidence from Alyx metadata, IBL publication metadata, real literature APIs, and open-access or user-registered PDFs.
+- Generate a static HTML dataset explorer for clicking through ALF objects and attributes.
 
 ## Remote OpenAlyx Tools
 
@@ -25,7 +27,8 @@ Use the IBL MCP when you need to:
 | Subjects and labs | `list_subjects`, `search_subjects`, `list_labs`, `list_projects`, `list_tags` |
 | Ecephys anatomy | `list_insertions`, `get_insertion`, `list_trajectories`, `list_channels`, `list_brain_regions` |
 | Behavior and signals | `get_trials`, `get_behavior_summary`, `get_wheel_data`, `get_lick_data`, `get_video_metadata`, `get_spike_metadata`, `get_cluster_qc` |
-| Reasoning | `semantic_search`, `get_related_papers`, `get_associated_code`, `query_knowledge_graph` |
+| Reasoning | `semantic_search`, `get_related_papers`, `get_dataset_papers`, `resolve_dataset_papers`, `query_dataset_papers`, `explain_dataset_variable`, `get_associated_code`, `query_knowledge_graph` |
+| Visual exploration | `generate_dataset_explorer`, `explain_visual_dataset_selection` |
 | Escape hatches | `call_alyx_api`, `confirmed_mutating_alyx_api` |
 
 Mutating Alyx calls are guarded behind explicit confirmation.
@@ -59,6 +62,12 @@ The local IBL explorer scans downloaded files and extracts:
 - Inferred modalities such as behavior, ecephys, and video.
 
 The signal inventory is ALF-aware. Rows include source file, collection, ALF object, ALF attribute, modality, and size.
+
+## Literature-Aware Variable Explanation
+
+Use `explain_dataset_variable` for unclear ALF variables such as `_ibl_trials.feedbackType.npy`, `_ibl_trials.choice.npy`, or `spikes.times.npy`. The tool combines Alyx dataset/session metadata, task protocol, project information, the IBL publication registry, and real public literature APIs. If confidence is low, it attempts open-access full text; if the needed PDF is unavailable, it returns a missing-PDF request with paper identifiers and an exact `register_paper_pdf` call.
+
+Use `generate_dataset_explorer` to create a static HTML artifact with local ALF variables, collections, modalities, papers, confidence status, and copyable MCP calls for selected variables.
 
 ## Example: Explore A Downloaded IBL Session
 

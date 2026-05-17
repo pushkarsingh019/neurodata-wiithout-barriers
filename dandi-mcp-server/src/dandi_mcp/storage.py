@@ -15,6 +15,7 @@ SCHEMA_VERSION = 1
 class StorageConfig:
     provider: str
     root_dir: Path
+    configuration_prompt: str | None = None
 
     @property
     def provider_dir(self) -> Path:
@@ -41,13 +42,29 @@ class MCPStorage:
     @classmethod
     def from_env(cls, provider: str) -> "MCPStorage":
         env_prefix = provider.upper().replace("-", "_")
-        root = Path(
-            os.environ.get(
-                f"{env_prefix}_MCP_STORAGE_DIR",
-                os.environ.get("NEURODATA_MCP_STORAGE_DIR", str(Path.home() / ".cache" / "neurodata-without-barriers")),
-            )
+        provider_env = f"{env_prefix}_MCP_STORAGE_DIR"
+        shared_env = "NEURODATA_MCP_STORAGE_DIR"
+        configured_root = os.environ.get(provider_env) or os.environ.get(shared_env)
+        prompt = None
+        if configured_root:
+            return cls(StorageConfig(provider=provider, root_dir=Path(configured_root)))
+
+        default_root = Path.home() / ".cache" / "neurodata-without-barriers"
+        prompt = (
+            f"{shared_env} is not set. Ask the user where MCP metadata, downloads, "
+            f"paper PDFs, and generated explorers should be stored; then set {shared_env} "
+            f"or {provider_env}. Using the default path for now."
         )
-        return cls(StorageConfig(provider=provider, root_dir=root))
+        try:
+            return cls(StorageConfig(provider=provider, root_dir=default_root, configuration_prompt=prompt))
+        except OSError as exc:
+            fallback_root = Path.cwd() / ".mcp-storage"
+            fallback_prompt = (
+                f"{prompt} The default path {default_root} was not writable ({exc}); "
+                f"using workspace-local fallback {fallback_root}. Ask the user to set "
+                f"{shared_env} to a persistent writable directory."
+            )
+            return cls(StorageConfig(provider=provider, root_dir=fallback_root, configuration_prompt=fallback_prompt))
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -57,6 +74,7 @@ class MCPStorage:
             "provider_dir": str(self.config.provider_dir),
             "database": str(self.config.db_path),
             "downloads_dir": str(self.config.downloads_dir),
+            "configuration_prompt": self.config.configuration_prompt,
         }
 
     def upsert_record(

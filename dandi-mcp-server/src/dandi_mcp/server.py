@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -8,6 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from dandi_mcp import __version__
 from dandi_mcp.client import DEFAULT_API_BASE_URL, DandiClient, DandiClientConfig
 from dandi_mcp.local_explorer import LocalDandisetExplorer
+from neurodata_literature import LiteratureService, build_dataset_explorer_html, stable_variable_id
 
 
 def build_server() -> FastMCP:
@@ -23,6 +25,7 @@ def build_server() -> FastMCP:
     )
     client = _client_from_env()
     local = LocalDandisetExplorer(client.storage)
+    literature = LiteratureService(client.storage, "dandi")
 
     @mcp.tool()
     def get_storage_info() -> dict[str, Any]:
@@ -641,6 +644,149 @@ def build_server() -> FastMCP:
         return client.get_related_papers(dandiset_id, version)
 
     @mcp.tool()
+    def get_dataset_papers(dataset_id: str, version: str = "draft") -> dict[str, Any]:
+        """Provider-compatible alias for papers and literature links associated with a DANDI dataset."""
+        return client.get_related_papers(dataset_id, version)
+
+    @mcp.tool()
+    def resolve_dataset_papers(
+        dataset_id: str,
+        version_or_tag: str = "draft",
+        include_citation_graph: bool = False,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        """Resolve DANDI dataset paper links through real public literature APIs."""
+        del include_citation_graph
+        return literature.resolve_papers(
+            dataset_id,
+            _dandi_paper_hints(client, dataset_id, version_or_tag),
+            limit=limit,
+            relationship="dataset",
+        )
+
+    @mcp.tool()
+    def query_dataset_papers(
+        dataset_id: str,
+        question: str,
+        version_or_tag: str = "draft",
+        full_text_policy: str = "auto",
+        limit: int = 8,
+    ) -> dict[str, Any]:
+        """Query DANDI-associated papers and escalate to full text when uncertainty is high."""
+        context = _safe_call(lambda: client.summarize_dandiset(dataset_id, version_or_tag), default={})
+        return literature.query_papers(
+            dataset_id=dataset_id,
+            question=question,
+            paper_hints=_dandi_paper_hints(client, dataset_id, version_or_tag),
+            dataset_context=context,
+            full_text_policy=full_text_policy,
+            limit=limit,
+        )
+
+    @mcp.tool()
+    def explain_dataset_variable(
+        dataset_key_or_id: str,
+        variable: str,
+        file_path: str | None = None,
+        object_path: str | None = None,
+        context: str | None = None,
+        version_or_tag: str = "draft",
+        full_text_policy: str = "auto",
+    ) -> dict[str, Any]:
+        """Explain an NWB/DANDI variable using local metadata, papers, and uncertainty-aware full text."""
+        variable_context = _dandi_variable_context(
+            local,
+            client,
+            dataset_key_or_id,
+            variable,
+            file_path=file_path,
+            object_path=object_path,
+            context=context,
+            version=version_or_tag,
+        )
+        return literature.explain_variable(
+            dataset_id=dataset_key_or_id,
+            variable=variable,
+            variable_context=variable_context,
+            paper_hints=_dandi_paper_hints(client, dataset_key_or_id, version_or_tag),
+            full_text_policy=full_text_policy,
+        )
+
+    @mcp.tool()
+    def register_paper_pdf(
+        dataset_id: str,
+        pdf_path: str,
+        doi: str | None = None,
+        title: str | None = None,
+    ) -> dict[str, Any]:
+        """Register a user-provided PDF for a DANDI dataset and index it for future explanations."""
+        return literature.register_pdf(dataset_id=dataset_id, pdf_path=pdf_path, doi=doi, title=title)
+
+    @mcp.tool()
+    def list_missing_paper_pdfs(dataset_id: str) -> dict[str, Any]:
+        """List papers whose PDFs were needed but could not be retrieved automatically."""
+        return literature.list_missing_pdfs(dataset_id)
+
+    @mcp.tool()
+    def generate_dataset_explorer(
+        dataset_key_or_id: str,
+        version_or_tag: str = "draft",
+        include_papers: bool = True,
+    ) -> dict[str, Any]:
+        """Generate a static HTML explorer for a DANDI/NWB dataset and its variables."""
+        summary, variables = _dandi_explorer_data(local, client, dataset_key_or_id, version_or_tag)
+        papers = (
+            literature.resolve_papers(dataset_key_or_id, _dandi_paper_hints(client, dataset_key_or_id, version_or_tag)).get("papers", [])
+            if include_papers
+            else []
+        )
+        explorer_id = stable_variable_id(dataset_key_or_id, {"kind": "explorer"}, "dataset")
+        artifact_dir = client.storage.config.provider_dir / "artifacts" / dataset_key_or_id.replace("/", "_").replace(":", "_")
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        html_path = artifact_dir / "dataset-explorer.html"
+        html_path.write_text(
+            build_dataset_explorer_html(
+                provider="dandi",
+                dataset_id=dataset_key_or_id,
+                title=str(summary.get("name") or dataset_key_or_id),
+                summary=summary,
+                variables=variables,
+                papers=papers,
+                missing_pdfs=literature.list_missing_pdfs(dataset_key_or_id).get("missing_pdfs", []),
+            ),
+            encoding="utf-8",
+        )
+        result = {
+            "status": "created",
+            "explorer_id": explorer_id,
+            "dataset_key_or_id": dataset_key_or_id,
+            "html_path": str(html_path),
+            "summary": {
+                "variable_count": len(variables),
+                "paper_count": len(papers),
+                "missing_pdf_count": len(literature.list_missing_pdfs(dataset_key_or_id).get("missing_pdfs", [])),
+            },
+        }
+        client.storage.upsert_record("dataset_explorer", explorer_id, result, source="neurodata_literature")
+        return result
+
+    @mcp.tool()
+    def explain_visual_dataset_selection(
+        explorer_id: str,
+        variable_id: str,
+        question: str | None = None,
+        full_text_policy: str = "auto",
+    ) -> dict[str, Any]:
+        """Return guidance for explaining a variable selected in a generated DANDI explorer."""
+        return {
+            "explorer_id": explorer_id,
+            "variable_id": variable_id,
+            "question": question,
+            "next_action": "Call explain_dataset_variable with the dataset id, variable name, and object_path shown in the explorer row.",
+            "full_text_policy": full_text_policy,
+        }
+
+    @mcp.tool()
     def find_similar_datasets(
         dandiset_id: str,
         version: str = "draft",
@@ -789,6 +935,103 @@ def _client_from_env() -> DandiClient:
         api_token=os.environ.get("DANDI_API_TOKEN") or os.environ.get("DANDI_API_KEY"),
     )
     return DandiClient(config)
+
+
+def _safe_call(call: Any, default: Any = None) -> Any:
+    try:
+        return call()
+    except Exception:
+        return default
+
+
+def _dandi_paper_hints(client: DandiClient, dataset_id: str, version: str) -> list[Any]:
+    hints: list[Any] = []
+    metadata = _safe_call(lambda: client.get_version_metadata(dataset_id, version), default={})
+    if metadata:
+        hints.extend(
+            [
+                metadata.get("citation"),
+                metadata.get("doi"),
+                metadata.get("url"),
+                metadata.get("name"),
+            ]
+        )
+        hints.extend(metadata.get("relatedResource") or [])
+        hints.extend(metadata.get("wasGeneratedBy") or [])
+    related = _safe_call(lambda: client.get_related_papers(dataset_id, version), default={})
+    hints.extend(related.get("papers", []) if isinstance(related, dict) else [])
+    return [hint for hint in hints if hint]
+
+
+def _dandi_variable_context(
+    local: LocalDandisetExplorer,
+    client: DandiClient,
+    dataset_key_or_id: str,
+    variable: str,
+    *,
+    file_path: str | None,
+    object_path: str | None,
+    context: str | None,
+    version: str,
+) -> dict[str, Any]:
+    ctx: dict[str, Any] = {
+        "provider": "dandi",
+        "dataset_id": dataset_key_or_id,
+        "variable": variable,
+        "file_path": file_path,
+        "object_path": object_path,
+        "user_context": context,
+    }
+    inventory = _safe_call(lambda: local.signal_inventory(dataset_key_or_id), default={})
+    for signal in inventory.get("signals", []) if isinstance(inventory, dict) else []:
+        text = " ".join(str(signal.get(key, "")) for key in ["name", "object_path", "file"])
+        if (object_path and signal.get("object_path") == object_path) or variable.lower() in text.lower():
+            ctx.update(signal)
+            ctx["kind"] = "nwb_signal"
+            return ctx
+    if file_path:
+        inspected = _safe_call(lambda: local.inspect_nwb(dataset_key_or_id, file_path), default={})
+        if inspected:
+            ctx.update(
+                {
+                    "kind": "nwb_file",
+                    "session_id": inspected.get("session_id"),
+                    "session_description": inspected.get("session_description"),
+                    "experiment_description": inspected.get("experiment_description"),
+                    "subject": inspected.get("subject"),
+                    "modalities": inspected.get("modalities"),
+                }
+            )
+    metadata = _safe_call(lambda: client.get_version_metadata(dataset_key_or_id, version), default={})
+    if metadata:
+        ctx.update(
+            {
+                "name": metadata.get("name"),
+                "description": metadata.get("description"),
+                "measurementTechnique": metadata.get("measurementTechnique"),
+                "variableMeasured": metadata.get("variableMeasured"),
+                "species": metadata.get("species"),
+            }
+        )
+    return ctx
+
+
+def _dandi_explorer_data(
+    local: LocalDandisetExplorer,
+    client: DandiClient,
+    dataset_key_or_id: str,
+    version: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    summary = _safe_call(lambda: local.summarize(dataset_key_or_id), default={})
+    variables = []
+    inventory = _safe_call(lambda: local.signal_inventory(dataset_key_or_id), default={})
+    for signal in inventory.get("signals", []) if isinstance(inventory, dict) else []:
+        variables.append({"provider": "dandi", "confidence_label": "low", **signal})
+    if not summary:
+        summary = _safe_call(lambda: client.summarize_dandiset(dataset_key_or_id, version), default={"name": dataset_key_or_id})
+        for item in summary.get("variableMeasured") or []:
+            variables.append({"provider": "dandi", "name": str(item), "kind": "metadata_variable", "confidence_label": "low"})
+    return summary, variables
 
 
 mcp = build_server()

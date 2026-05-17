@@ -215,7 +215,12 @@ class LocalDandisetExplorer:
         )
         sessions = sorted(
             {
-                str(summary.get("session_id") or file_record.get("session") or summary["relative_path"])
+                str(
+                    summary.get("session_id")
+                    or file_record.get("session")
+                    or summary.get("relative_path")
+                    or file_record["path"]
+                )
                 for summary, file_record in zip(summaries, nwb_files)
             }
         )
@@ -225,7 +230,7 @@ class LocalDandisetExplorer:
             for ts in summary.get("timeseries", []):
                 signal_inventory.append(
                     {
-                        "file": summary["relative_path"],
+                        "file": summary.get("relative_path") or summary.get("path"),
                         "object_path": ts["object_path"],
                         "name": ts["name"],
                         "neurodata_type": ts["neurodata_type"],
@@ -251,7 +256,7 @@ class LocalDandisetExplorer:
             "signal_inventory": signal_inventory,
             "trial_tables": [
                 {
-                    "file": summary["relative_path"],
+                    "file": summary.get("relative_path") or summary.get("path"),
                     **summary["trials"],
                 }
                 for summary in summaries
@@ -259,7 +264,7 @@ class LocalDandisetExplorer:
             ],
             "unit_tables": [
                 {
-                    "file": summary["relative_path"],
+                    "file": summary.get("relative_path") or summary.get("path"),
                     **summary["units"],
                 }
                 for summary in summaries

@@ -244,6 +244,49 @@ class IBLDomainService:
         )
         return self._envelope(data, endpoint="static_publication_registry").model_dump_plain()
 
+    def get_dataset_papers(self, dataset_id: str, include_session_context: bool = True) -> dict[str, Any]:
+        dataset = self.client.get_dataset(dataset_id)
+        session_id = _session_id_from_dataset(dataset)
+        session = None
+        if include_session_context and session_id:
+            try:
+                session = self.client.get_session(session_id)
+            except Exception:
+                session = None
+        project = _project_from_records(dataset, session)
+        dataset_type = _dataset_type_from_record(dataset)
+        query = " ".join(
+            part
+            for part in [
+                dataset.get("name"),
+                dataset.get("collection"),
+                dataset.get("rel_path"),
+                dataset_type,
+                _session_text(session),
+            ]
+            if part
+        )
+        papers = related_publications(query=query, project=project, dataset_type=dataset_type)
+        data = {
+            "dataset_id": dataset_id,
+            "session_id": session_id,
+            "project": project,
+            "dataset_type": dataset_type,
+            "query_terms": query,
+            "papers": papers,
+            "limitations": (
+                "IBL paper linkage is inferred from dataset/session metadata against the local "
+                "IBL publication registry; Alyx dataset records do not expose a direct publication relation."
+            ),
+        }
+        self.client.storage.upsert_record(
+            "dataset_papers",
+            dataset_id,
+            data,
+            source="IBL dataset metadata and static publication registry",
+        )
+        return self._envelope(data, endpoint="datasets/static_publication_registry", session_id=session_id, dataset_ids=[dataset_id]).model_dump_plain()
+
     def get_associated_code(self, query: str = "", project: str = "") -> dict[str, Any]:
         papers = related_publications(query=query, project=project)
         repos = sorted({repo for paper in papers for repo in paper.get("code", [])})
@@ -357,6 +400,55 @@ def record_id(row: dict[str, Any]) -> str:
     if url:
         return url.rsplit("/", 1)[-1]
     return ""
+
+
+def _session_id_from_dataset(dataset: dict[str, Any]) -> str | None:
+    session = dataset.get("session")
+    if isinstance(session, dict):
+        return record_id(session) or str(session.get("eid") or session.get("id") or "") or None
+    if isinstance(session, str) and session:
+        return session.rstrip("/").rsplit("/", 1)[-1]
+    return None
+
+
+def _dataset_type_from_record(dataset: dict[str, Any]) -> str:
+    dataset_type = dataset.get("dataset_type")
+    if isinstance(dataset_type, dict):
+        return str(dataset_type.get("name") or dataset_type.get("filename") or dataset_type.get("id") or "")
+    return str(dataset_type or dataset.get("name") or "")
+
+
+def _project_from_records(dataset: dict[str, Any], session: dict[str, Any] | None) -> str:
+    for record in [dataset, session or {}]:
+        value = record.get("project")
+        if isinstance(value, str) and value:
+            return value
+        if isinstance(value, dict):
+            name = value.get("name") or value.get("id")
+            if name:
+                return str(name)
+        projects = record.get("projects")
+        if isinstance(projects, list) and projects:
+            first = projects[0]
+            if isinstance(first, dict):
+                return str(first.get("name") or first.get("id") or "")
+            return str(first)
+    return ""
+
+
+def _session_text(session: dict[str, Any] | None) -> str:
+    if not session:
+        return ""
+    return " ".join(
+        str(value)
+        for value in [
+            session.get("task_protocol"),
+            session.get("project"),
+            session.get("lab"),
+            session.get("subject"),
+        ]
+        if value
+    )
 
 
 def dataset_matches_any(row: dict[str, Any], patterns: list[str]) -> bool:

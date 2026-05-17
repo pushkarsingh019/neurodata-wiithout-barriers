@@ -16,6 +16,13 @@ This page compares the common local dataset explorer tools across DANDI, OpenNeu
 | `get_dataset_sessions` | Yes | Yes | Yes |
 | `get_dataset_signal_inventory` | Yes | Yes | Yes |
 | `generate_dataset_report` | Yes | Yes | Yes |
+| `resolve_dataset_papers` | Yes | Yes | Yes |
+| `query_dataset_papers` | Yes | Yes | Yes |
+| `explain_dataset_variable` | Yes | Yes | Yes |
+| `register_paper_pdf` | Yes | Yes | Yes |
+| `list_missing_paper_pdfs` | Yes | Yes | Yes |
+| `generate_dataset_explorer` | Yes | Yes | Yes |
+| `explain_visual_dataset_selection` | Yes | Yes | Yes |
 
 ## Provider-Specific Local Tools
 
@@ -61,3 +68,7 @@ Then branch into provider-specific tools:
 - Use DANDI's `inspect_nwb_file` and `validate_nwb_file` for NWB files.
 - Use OpenNeuro's `extract_events_table` for local BIDS events.
 - Use IBL's remote domain tools when a local ALF file points back to a known session or dataset record.
+
+For literature-aware variable explanation, agents should call `explain_dataset_variable` first. The tool uses dataset metadata, real public literature APIs, abstracts, and open-access PDFs when needed. If the required full text is unavailable, the response includes `missing_pdfs` with the paper title, identifiers, download hints, and an exact `register_paper_pdf` call for the user-provided PDF.
+
+For a visual workflow, call `generate_dataset_explorer`. It creates a static HTML artifact with the dataset summary, variables, papers, confidence badges, and copyable MCP calls for selected variables.

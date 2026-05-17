@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -9,6 +10,7 @@ from openneuro_mcp import __version__
 from openneuro_mcp.client import DEFAULT_GRAPHQL_URL, DEFAULT_RAW_DATASET_URL, OpenNeuroClient, OpenNeuroClientConfig
 from openneuro_mcp.local_explorer import LocalOpenNeuroExplorer
 from openneuro_mcp.service import OpenNeuroSemanticService
+from neurodata_literature import LiteratureService, build_dataset_explorer_html, stable_variable_id
 
 
 def build_server() -> FastMCP:
@@ -24,6 +26,7 @@ def build_server() -> FastMCP:
     )
     service = OpenNeuroSemanticService(_client_from_env())
     local = LocalOpenNeuroExplorer(service.storage)
+    literature = LiteratureService(service.storage, "openneuro")
 
     @mcp.tool()
     def get_storage_info() -> dict[str, Any]:
@@ -164,6 +167,149 @@ def build_server() -> FastMCP:
         return service.get_related_papers(dataset_id, tag=tag)
 
     @mcp.tool()
+    def get_dataset_papers(dataset_id: str, tag: str = "latest") -> dict[str, Any]:
+        """Provider-compatible alias for papers and literature links associated with an OpenNeuro dataset."""
+        return service.get_related_papers(dataset_id, tag=tag)
+
+    @mcp.tool()
+    def resolve_dataset_papers(
+        dataset_id: str,
+        version_or_tag: str = "latest",
+        include_citation_graph: bool = False,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        """Resolve OpenNeuro dataset paper links through real public literature APIs."""
+        del include_citation_graph
+        return literature.resolve_papers(
+            dataset_id,
+            _openneuro_paper_hints(service, dataset_id, version_or_tag),
+            limit=limit,
+            relationship="dataset",
+        )
+
+    @mcp.tool()
+    def query_dataset_papers(
+        dataset_id: str,
+        question: str,
+        version_or_tag: str = "latest",
+        full_text_policy: str = "auto",
+        limit: int = 8,
+    ) -> dict[str, Any]:
+        """Query OpenNeuro-associated papers and escalate to full text when uncertainty is high."""
+        context = _safe_call(lambda: service.get_dataset_metadata(dataset_id, tag=version_or_tag), default={})
+        return literature.query_papers(
+            dataset_id=dataset_id,
+            question=question,
+            paper_hints=_openneuro_paper_hints(service, dataset_id, version_or_tag),
+            dataset_context=context,
+            full_text_policy=full_text_policy,
+            limit=limit,
+        )
+
+    @mcp.tool()
+    def explain_dataset_variable(
+        dataset_key_or_id: str,
+        variable: str,
+        file_path: str | None = None,
+        object_path: str | None = None,
+        context: str | None = None,
+        version_or_tag: str = "latest",
+        full_text_policy: str = "auto",
+    ) -> dict[str, Any]:
+        """Explain a BIDS/OpenNeuro variable using metadata, papers, and uncertainty-aware full text."""
+        del object_path
+        variable_context = _openneuro_variable_context(
+            local,
+            service,
+            dataset_key_or_id,
+            variable,
+            file_path=file_path,
+            context=context,
+            tag=version_or_tag,
+        )
+        return literature.explain_variable(
+            dataset_id=dataset_key_or_id,
+            variable=variable,
+            variable_context=variable_context,
+            paper_hints=_openneuro_paper_hints(service, dataset_key_or_id, version_or_tag),
+            full_text_policy=full_text_policy,
+        )
+
+    @mcp.tool()
+    def register_paper_pdf(
+        dataset_id: str,
+        pdf_path: str,
+        doi: str | None = None,
+        title: str | None = None,
+    ) -> dict[str, Any]:
+        """Register a user-provided PDF for an OpenNeuro dataset and index it for future explanations."""
+        return literature.register_pdf(dataset_id=dataset_id, pdf_path=pdf_path, doi=doi, title=title)
+
+    @mcp.tool()
+    def list_missing_paper_pdfs(dataset_id: str) -> dict[str, Any]:
+        """List papers whose PDFs were needed but could not be retrieved automatically."""
+        return literature.list_missing_pdfs(dataset_id)
+
+    @mcp.tool()
+    def generate_dataset_explorer(
+        dataset_key_or_id: str,
+        version_or_tag: str = "latest",
+        include_papers: bool = True,
+    ) -> dict[str, Any]:
+        """Generate a static HTML explorer for an OpenNeuro/BIDS dataset and its variables."""
+        summary, variables = _openneuro_explorer_data(local, service, dataset_key_or_id, version_or_tag)
+        papers = (
+            literature.resolve_papers(dataset_key_or_id, _openneuro_paper_hints(service, dataset_key_or_id, version_or_tag)).get("papers", [])
+            if include_papers
+            else []
+        )
+        explorer_id = stable_variable_id(dataset_key_or_id, {"kind": "explorer"}, "dataset")
+        artifact_dir = service.storage.config.provider_dir / "artifacts" / dataset_key_or_id.replace("/", "_").replace(":", "_")
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        html_path = artifact_dir / "dataset-explorer.html"
+        html_path.write_text(
+            build_dataset_explorer_html(
+                provider="openneuro",
+                dataset_id=dataset_key_or_id,
+                title=str(summary.get("name") or dataset_key_or_id),
+                summary=summary,
+                variables=variables,
+                papers=papers,
+                missing_pdfs=literature.list_missing_pdfs(dataset_key_or_id).get("missing_pdfs", []),
+            ),
+            encoding="utf-8",
+        )
+        result = {
+            "status": "created",
+            "explorer_id": explorer_id,
+            "dataset_key_or_id": dataset_key_or_id,
+            "html_path": str(html_path),
+            "summary": {
+                "variable_count": len(variables),
+                "paper_count": len(papers),
+                "missing_pdf_count": len(literature.list_missing_pdfs(dataset_key_or_id).get("missing_pdfs", [])),
+            },
+        }
+        service.storage.upsert_record("dataset_explorer", explorer_id, result, source="neurodata_literature")
+        return result
+
+    @mcp.tool()
+    def explain_visual_dataset_selection(
+        explorer_id: str,
+        variable_id: str,
+        question: str | None = None,
+        full_text_policy: str = "auto",
+    ) -> dict[str, Any]:
+        """Return guidance for explaining a variable selected in a generated OpenNeuro explorer."""
+        return {
+            "explorer_id": explorer_id,
+            "variable_id": variable_id,
+            "question": question,
+            "next_action": "Call explain_dataset_variable with the dataset id, variable name, and file_path shown in the explorer row.",
+            "full_text_policy": full_text_policy,
+        }
+
+    @mcp.tool()
     def find_similar_datasets(dataset_id: str, limit: int = 10) -> dict[str, Any]:
         """Find graph-related datasets sharing modalities, species, paradigms, authors, or papers."""
         return service.find_similar_datasets(dataset_id, limit=limit)
@@ -238,6 +384,112 @@ def build_server() -> FastMCP:
         }
 
     return mcp
+
+
+def _safe_call(call: Any, default: Any = None) -> Any:
+    try:
+        return call()
+    except Exception:
+        return default
+
+
+def _openneuro_paper_hints(
+    service: OpenNeuroSemanticService,
+    dataset_id: str,
+    tag: str,
+) -> list[Any]:
+    hints: list[Any] = []
+    metadata = _safe_call(lambda: service.get_dataset_metadata(dataset_id, tag=tag), default={})
+    if metadata:
+        hints.append(metadata.get("doi"))
+        hints.append(metadata.get("name"))
+        description = metadata.get("description") or {}
+        hints.extend(description.get("ReferencesAndLinks") or [])
+        hints.extend(metadata.get("citations") or [])
+    related = _safe_call(lambda: service.get_related_papers(dataset_id, tag=tag), default={})
+    hints.extend(related.get("papers", []) if isinstance(related, dict) else [])
+    return [hint for hint in hints if hint]
+
+
+def _openneuro_variable_context(
+    local: LocalOpenNeuroExplorer,
+    service: OpenNeuroSemanticService,
+    dataset_key_or_id: str,
+    variable: str,
+    *,
+    file_path: str | None,
+    context: str | None,
+    tag: str,
+) -> dict[str, Any]:
+    ctx: dict[str, Any] = {
+        "provider": "openneuro",
+        "dataset_id": dataset_key_or_id,
+        "variable": variable,
+        "file_path": file_path,
+        "user_context": context,
+    }
+    inventory = _safe_call(lambda: local.signal_inventory(dataset_key_or_id), default={})
+    for signal in inventory.get("signals", []) if isinstance(inventory, dict) else []:
+        text = " ".join(str(signal.get(key, "")) for key in ["file", "suffix", "task", "modality"])
+        if (file_path and signal.get("file") == file_path) or variable.lower() in text.lower():
+            ctx.update(signal)
+            ctx["kind"] = "bids_signal"
+            break
+    if file_path and file_path.endswith("_events.tsv"):
+        events = _safe_call(lambda: local.extract_events(dataset_key_or_id, path=file_path), default={})
+        if events:
+            ctx.update(
+                {
+                    "kind": "bids_events",
+                    "task": events.get("task"),
+                    "columns": events.get("columns"),
+                    "trial_type_values": events.get("trial_type_values"),
+                    "onset_range_seconds": events.get("onset_range_seconds"),
+                    "duration_range_seconds": events.get("duration_range_seconds"),
+                }
+            )
+    metadata = _safe_call(lambda: service.get_dataset_metadata(dataset_key_or_id, tag=tag), default={})
+    if metadata:
+        ctx.update(
+            {
+                "name": metadata.get("name"),
+                "description": metadata.get("description"),
+                "modalities": metadata.get("modalities"),
+                "species": metadata.get("species"),
+                "behavioral_paradigms": metadata.get("behavioral_paradigms"),
+            }
+        )
+    return ctx
+
+
+def _openneuro_explorer_data(
+    local: LocalOpenNeuroExplorer,
+    service: OpenNeuroSemanticService,
+    dataset_key_or_id: str,
+    tag: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    summary = _safe_call(lambda: local.summarize(dataset_key_or_id), default={})
+    variables = []
+    inventory = _safe_call(lambda: local.signal_inventory(dataset_key_or_id), default={})
+    for signal in inventory.get("signals", []) if isinstance(inventory, dict) else []:
+        variables.append({"provider": "openneuro", "confidence_label": "low", **signal})
+    index = _safe_call(lambda: local.index(dataset_key_or_id), default={})
+    for event in index.get("events", []) if isinstance(index, dict) else []:
+        for column in event.get("columns", []):
+            variables.append(
+                {
+                    "provider": "openneuro",
+                    "kind": "events_column",
+                    "name": column,
+                    "column": column,
+                    "file": event.get("path"),
+                    "task": event.get("task"),
+                    "confidence_label": "low",
+                }
+            )
+    if not summary:
+        summary = _safe_call(lambda: service.get_dataset_metadata(dataset_key_or_id, tag=tag), default={"name": dataset_key_or_id})
+    return summary, variables
 
 
 def _client_from_env() -> OpenNeuroClient:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,9 @@ from dandi_mcp.storage import MCPStorage, StorageConfig
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SAMPLE_DANDISET = REPO_ROOT / "001097"
+
+
+HAS_PYNWB = importlib.util.find_spec("pynwb") is not None
 
 
 def _explorer(tmp_path: Path) -> LocalDandisetExplorer:
@@ -33,6 +37,7 @@ def test_register_and_browse_local_dandiset(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(not SAMPLE_DANDISET.exists(), reason="sample Dandiset is not available")
+@pytest.mark.skipif(not HAS_PYNWB, reason="pynwb is required for sample NWB inspection")
 def test_inspect_index_and_report_sample_nwb(tmp_path: Path) -> None:
     explorer = _explorer(tmp_path)
     registered = explorer.register(path=str(SAMPLE_DANDISET))
@@ -52,6 +57,7 @@ def test_inspect_index_and_report_sample_nwb(tmp_path: Path) -> None:
     assert Path(report["report_path"]).exists()
 
 
+@pytest.mark.skipif(not HAS_PYNWB, reason="pynwb is required for sample NWB inspection")
 def test_extract_trials_reports_not_found_for_sample_without_trials(tmp_path: Path) -> None:
     explorer = _explorer(tmp_path)
     registered = explorer.register(path=str(SAMPLE_DANDISET))

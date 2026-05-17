@@ -17,6 +17,8 @@ Use the DANDI MCP when you need to:
 - Run NWBInspector validation.
 - Build a cross-file dataset index of subjects, sessions, trials, units, processing modules, and signals.
 - Generate a Markdown report for a downloaded Dandiset.
+- Explain NWB variables with uncertainty-aware evidence from DANDI metadata, real literature APIs, and open-access or user-registered PDFs.
+- Generate a static HTML dataset explorer for clicking through NWB variables.
 
 ## Remote Archive Tools
 
@@ -29,7 +31,8 @@ DANDI archive tools are read-oriented by default:
 | Assets | `list_assets`, `list_asset_paths`, `get_asset_metadata`, `get_asset_info`, `get_asset_validation` |
 | Downloads | `get_asset_download_url`, `get_version_asset_download_url` |
 | Zarr | `list_zarr_archives`, `get_zarr_archive`, `list_zarr_files` |
-| Neuroscience intelligence | `analyze_dandiset_neuroscience`, `get_related_papers`, `find_similar_datasets`, `get_dandiset_knowledge_graph` |
+| Neuroscience intelligence | `analyze_dandiset_neuroscience`, `get_related_papers`, `resolve_dataset_papers`, `query_dataset_papers`, `explain_dataset_variable`, `find_similar_datasets`, `get_dandiset_knowledge_graph` |
+| Visual exploration | `generate_dataset_explorer`, `explain_visual_dataset_selection` |
 | Escape hatch | `call_dandi_api` |
 
 Mutating tools exist for authenticated archive workflows, but they are guarded by explicit confirmation flags.
@@ -72,6 +75,12 @@ DANDI has additional NWB-specific tools:
 | `extract_trials_table` | Return a bounded preview of the NWB trials table when present |
 
 The implementation avoids loading full arrays by default. It reads shapes, object names, metadata, rates, units, and table schemas first.
+
+## Literature-Aware Variable Explanation
+
+Use `explain_dataset_variable` when an NWB object path, time series name, or table column is unclear. The tool first uses local NWB metadata and DANDI metadata, then resolves associated papers through public APIs such as Semantic Scholar, Crossref, PubMed, Europe PMC, OpenAlex, DataCite, and arXiv. If confidence is low, it attempts open-access full text. If the needed PDF cannot be retrieved, it returns a `pdf_required_but_missing` response with the paper title, DOI or URL, and a `register_paper_pdf` call.
+
+Use `generate_dataset_explorer` to create a static HTML artifact that lists variables, files, papers, confidence status, and copyable MCP calls for clicked variables.
 
 ## Example: Explore A Downloaded Dandiset
 

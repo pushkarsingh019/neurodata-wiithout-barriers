@@ -15,6 +15,8 @@ Use the OpenNeuro MCP when you need to:
 - Build semantic and graph-style dataset relationships.
 - Register and inspect a downloaded BIDS dataset locally.
 - Generate a local BIDS dataset report.
+- Explain BIDS variables and event columns with uncertainty-aware evidence from dataset metadata, real literature APIs, and open-access or user-registered PDFs.
+- Generate a static HTML dataset explorer for clicking through BIDS files and variables.
 
 ## Remote OpenNeuro Tools
 
@@ -24,7 +26,8 @@ Use the OpenNeuro MCP when you need to:
 | Metadata | `get_dataset_metadata`, `get_dataset_files`, `get_modalities`, `get_subject_info` |
 | Tasks and events | `get_task_structure`, `get_events`, `find_behavioral_paradigms` |
 | Derivatives and code | `get_derivatives`, `get_analysis_pipelines`, `get_associated_code` |
-| Literature and graph | `get_related_papers`, `find_similar_datasets`, `query_knowledge_graph` |
+| Literature and graph | `get_related_papers`, `resolve_dataset_papers`, `query_dataset_papers`, `explain_dataset_variable`, `find_similar_datasets`, `query_knowledge_graph` |
+| Visual exploration | `generate_dataset_explorer`, `explain_visual_dataset_selection` |
 
 The OpenNeuro server is read-only by design.
 
@@ -52,6 +55,12 @@ extract_events_table
 ```
 
 This tool reads a local BIDS `events.tsv` file and returns a bounded preview with columns, row count, trial types, onset range, and duration range.
+
+## Literature-Aware Variable Explanation
+
+Use `explain_dataset_variable` for unclear BIDS entities, `events.tsv` columns, task names, or sidecar-described fields. The tool resolves `DatasetDOI` and `ReferencesAndLinks` through real public APIs and escalates to open-access full text when abstract-level evidence is not enough. If no PDF can be retrieved, it returns a missing-PDF request with paper identifiers and an exact `register_paper_pdf` call.
+
+Use `generate_dataset_explorer` to create a static HTML artifact with dataset metadata, BIDS files, event columns, papers, confidence status, and copyable MCP calls for selected variables.
 
 ## Local BIDS Index
 

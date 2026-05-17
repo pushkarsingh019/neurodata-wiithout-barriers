@@ -87,3 +87,47 @@ def test_semantic_search_returns_publication_and_modality_matches() -> None:
 
     assert result["data"]["results"]
     assert result["data"]["mode"] == "lexical-semantic-fallback"
+
+
+def test_get_dataset_papers_infers_publications_from_dataset_and_session() -> None:
+    dataset_id = "00000000-0000-4000-8000-000000000111"
+    session_id = "00000000-0000-4000-8000-000000000222"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path == f"/datasets/{dataset_id}":
+            return httpx.Response(
+                200,
+                json={
+                    "id": dataset_id,
+                    "name": "spikes.times.npy",
+                    "collection": "alf/probe00",
+                    "dataset_type": "spikes.times.npy",
+                    "session": session_id,
+                },
+            )
+        if path == f"/sessions/{session_id}":
+            return httpx.Response(
+                200,
+                json={
+                    "id": session_id,
+                    "project": "ibl_neuropixel_brainwide_01",
+                    "task_protocol": "biasedChoiceWorld",
+                },
+            )
+        raise AssertionError(str(request.url))
+
+    service = IBLDomainService(
+        IBLClient(
+            IBLClientConfig(alyx_base_url="https://openalyx.example.test"),
+            transport=httpx.MockTransport(handler),
+        )
+    )
+
+    result = service.get_dataset_papers(dataset_id)
+
+    assert result["data"]["dataset_id"] == dataset_id
+    assert result["data"]["session_id"] == session_id
+    assert result["data"]["project"] == "ibl_neuropixel_brainwide_01"
+    assert result["data"]["papers"][0]["id"] == "ibl-2023-brain-wide-map"
+    assert result["provenance"]["dataset_ids"] == [dataset_id]
