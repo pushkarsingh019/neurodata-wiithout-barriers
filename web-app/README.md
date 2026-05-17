@@ -13,6 +13,8 @@ docker compose -f docker-compose.web.yml up --build
 
 Open `http://127.0.0.1:8787`. The container serves the built React frontend and the FastAPI backend from the same origin, stores cache/index data in a Docker volume, and does not require local datasets in the repo.
 
+The hosted app also includes a documentation screen at `/docs` with the suite map, hosting notes, local development commands, and data-handling policy.
+
 ## Runtime Configuration
 
 The app can use any OpenAI-compatible local or hosted model endpoint. AI summaries gracefully show as unavailable when no model server is configured.
@@ -45,6 +47,12 @@ npm run dev
 ```
 
 Open `http://127.0.0.1:5173`.
+
+For frontend-only split hosting, build with:
+
+```bash
+VITE_API_BASE_URL=https://your-api-host npm run build
+```
 
 ## Data Handling
 

@@ -1,16 +1,20 @@
 import {
   Activity,
   ArrowRight,
+  BookOpen,
   BrainCircuit,
   CheckCircle2,
   Code2,
   Database,
   Download,
   FileText,
+  Globe2,
   Loader2,
   Map as MapIcon,
   Search,
+  Server,
   Sparkles,
+  Terminal,
   TriangleAlert
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -32,8 +36,13 @@ function routeDatasetId(): string | null {
   return match?.[1] ?? null;
 }
 
+function routeIsDocs(): boolean {
+  return window.location.pathname === "/docs";
+}
+
 export function App() {
   const [datasetId, setDatasetId] = useState<string | null>(() => routeDatasetId());
+  const [docsOpen, setDocsOpen] = useState(() => routeIsDocs());
   const [health, setHealth] = useState<HealthResponse | null>(null);
 
   useEffect(() => {
@@ -42,29 +51,40 @@ export function App() {
 
   const navigate = (id: string) => {
     window.history.pushState({}, "", `/data/dandi_${id}`);
+    setDocsOpen(false);
     setDatasetId(id);
   };
 
+  const openDocs = () => {
+    window.history.pushState({}, "", "/docs");
+    setDatasetId(null);
+    setDocsOpen(true);
+  };
+
   useEffect(() => {
-    const onPop = () => setDatasetId(routeDatasetId());
+    const onPop = () => {
+      setDatasetId(routeDatasetId());
+      setDocsOpen(routeIsDocs());
+    };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   return (
     <div className="app-shell">
-      <TopBar health={health} onHome={() => navigateHome(setDatasetId)} />
-      {datasetId ? <DatasetView datasetId={datasetId} /> : <Landing onNavigate={navigate} health={health} />}
+      <TopBar health={health} onHome={() => navigateHome(setDatasetId, setDocsOpen)} onDocs={openDocs} />
+      {datasetId ? <DatasetView datasetId={datasetId} /> : docsOpen ? <Documentation /> : <Landing onNavigate={navigate} health={health} />}
     </div>
   );
 }
 
-function navigateHome(setDatasetId: (value: string | null) => void) {
+function navigateHome(setDatasetId: (value: string | null) => void, setDocsOpen: (value: boolean) => void) {
   window.history.pushState({}, "", "/");
   setDatasetId(null);
+  setDocsOpen(false);
 }
 
-function TopBar({ health, onHome }: { health: HealthResponse | null; onHome: () => void }) {
+function TopBar({ health, onHome, onDocs }: { health: HealthResponse | null; onHome: () => void; onDocs: () => void }) {
   const ready = health?.llm.status === "ready";
   return (
     <header className="topbar">
@@ -72,9 +92,15 @@ function TopBar({ health, onHome }: { health: HealthResponse | null; onHome: () 
         <BrainCircuit size={23} />
         <span>Neurodata Without Barriers</span>
       </button>
-      <div className={ready ? "status-pill good" : "status-pill warn"} title={health?.llm.base_url ?? "Checking local LLM"}>
-        {ready ? <CheckCircle2 size={16} /> : <TriangleAlert size={16} />}
-        <span>{ready ? health?.llm.model ?? "Local LLM ready" : "LLM checking"}</span>
+      <div className="topbar-actions">
+        <button className="docs-button" onClick={onDocs}>
+          <BookOpen size={16} />
+          <span>Docs</span>
+        </button>
+        <div className={ready ? "status-pill good" : "status-pill warn"} title={health?.llm.base_url ?? "Checking local LLM"}>
+          {ready ? <CheckCircle2 size={16} /> : <TriangleAlert size={16} />}
+          <span>{ready ? health?.llm.model ?? "Local LLM ready" : "LLM checking"}</span>
+        </div>
       </div>
     </header>
   );
@@ -124,7 +150,7 @@ function Landing({ onNavigate, health }: { onNavigate: (datasetId: string) => vo
         <div className="quick-row">
           <button onClick={() => onNavigate("001097")}>
             <Database size={17} />
-            <span>Open local sample 001097</span>
+            <span>Open DANDI example 001097</span>
           </button>
           <div className="quiet-note">
             LLM: {health?.llm.status === "ready" ? health.llm.model : "checking http://100.67.104.58:8001/v1"}
@@ -149,6 +175,100 @@ function Landing({ onNavigate, health }: { onNavigate: (datasetId: string) => vo
         </div>
       </section>
     </main>
+  );
+}
+
+function Documentation() {
+  return (
+    <main className="docs-page">
+      <section className="docs-hero">
+        <div>
+          <div className="eyebrow">
+            <BookOpen size={16} />
+            <span>Documentation</span>
+          </div>
+          <h1>Run the browser explorer, MCP servers, and local data tools from one suite.</h1>
+          <p>
+            The project is built around a hostable web app plus Model Context Protocol servers for DANDI,
+            OpenNeuro, and IBL. Public archive metadata can be explored immediately; local data stays on the
+            machine or runtime volume where the app indexes it.
+          </p>
+        </div>
+      </section>
+
+      <section className="docs-grid">
+        <DocCard icon={<Globe2 size={22} />} title="Web Explorer">
+          <p>React + FastAPI interface for resolving DANDI IDs, reading archive metadata, mapping NWB variables, indexing local Dandiset paths, and exporting dataset-specific skills.</p>
+          <CodeSnippet value={"docker compose -f docker-compose.web.yml up --build"} />
+        </DocCard>
+        <DocCard icon={<Server size={22} />} title="MCP Servers">
+          <p>DANDI, OpenNeuro, and IBL servers expose provider-native discovery tools plus a shared local dataset explorer API for agent workflows.</p>
+          <CodeSnippet value={"python harness/generate_mcp_config.py --format mcp-json"} />
+        </DocCard>
+        <DocCard icon={<Database size={22} />} title="Data Policy">
+          <p>NWB files, downloaded samples, generated figures, local cache, and session recordings are ignored by git. Commit code, docs, configs, and reproducible hosting assets only.</p>
+          <CodeSnippet value={"NEURODATA_MCP_STORAGE_DIR=/data/.mcp-storage"} />
+        </DocCard>
+        <DocCard icon={<Terminal size={22} />} title="Local Development">
+          <p>Run the backend and frontend separately while building. Use an OpenAI-compatible model endpoint when AI summaries are desired.</p>
+          <CodeSnippet value={"cd web-app/backend && uv run --extra analysis uvicorn neurodata_web.main:app --reload --port 8787"} />
+        </DocCard>
+      </section>
+
+      <section className="docs-section">
+        <div className="section-title">
+          <h2>Suite Map</h2>
+          <span>What is included</span>
+        </div>
+        <div className="suite-table">
+          <SuiteRow name="DANDI MCP" path="dandi-mcp-server" detail="Dandisets, versions, assets, download URLs, NWB/Zarr inspection, NWB validation, signal inventory, and literature-aware variable explanation." />
+          <SuiteRow name="OpenNeuro MCP" path="openneuro-mcp-server" detail="OpenNeuro search, BIDS metadata, participants, tasks, events, derivatives, local BIDS indexing, and semantic discovery." />
+          <SuiteRow name="IBL MCP" path="ibl-mcp-server" detail="OpenAlyx sessions, datasets, subjects, insertions, channels, behavior summaries, ecephys metadata, and local ALF-style indexing." />
+          <SuiteRow name="Web App" path="web-app" detail="Browser workflow for DANDI dataset pages, local NWB indexing, variable maps, AI summaries, skill export, and single-container hosting." />
+          <SuiteRow name="Harness" path="harness" detail="Utilities for checking server entry points and generating MCP client configuration for agent environments." />
+          <SuiteRow name="Docs Site" path="docs" detail="MkDocs guide set covering installation, shared explorer workflows, provider-specific servers, compatibility, and development." />
+        </div>
+      </section>
+
+      <section className="docs-section two-column-docs">
+        <div>
+          <h2>Hosting Checklist</h2>
+          <p>Copy `web-app/.env.example` only when you need overrides. Compose works without a checked-in `.env`, serves the built frontend from FastAPI, and keeps runtime state in a Docker volume.</p>
+        </div>
+        <div>
+          <h2>Split Hosting</h2>
+          <p>Build the frontend with `VITE_API_BASE_URL=https://your-api-host` and set `NEURODATA_CORS_ORIGINS` on the backend to the exact frontend origin.</p>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function DocCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <article className="doc-card">
+      <div className="doc-card-title">
+        {icon}
+        <h2>{title}</h2>
+      </div>
+      {children}
+    </article>
+  );
+}
+
+function CodeSnippet({ value }: { value: string }) {
+  return <pre className="inline-code-snippet">{value}</pre>;
+}
+
+function SuiteRow({ name, path, detail }: { name: string; path: string; detail: string }) {
+  return (
+    <div className="suite-row">
+      <div>
+        <strong>{name}</strong>
+        <span>{path}</span>
+      </div>
+      <p>{detail}</p>
+    </div>
   );
 }
 
