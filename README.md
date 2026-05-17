@@ -36,3 +36,14 @@ python harness/generate_mcp_config.py --format mcp-json
 ```
 
 See [docs/HARNESS.md](docs/HARNESS.md) for generated config formats and recommended usage.
+
+## Documentation Site
+
+The repository includes a unified MkDocs Material documentation site for all three MCP servers:
+
+```bash
+mkdocs build --strict
+mkdocs serve
+```
+
+Start with [docs/index.md](docs/index.md), then read the server guides under [docs/mcps](docs/mcps).

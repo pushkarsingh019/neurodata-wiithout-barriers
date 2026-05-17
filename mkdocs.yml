@@ -1,0 +1,55 @@
+site_name: Neurodata Without Barriers
+site_description: Model Context Protocol servers for DANDI, OpenNeuro, and IBL neuroscience data discovery and local dataset exploration.
+site_url: https://pushkarsingh019.github.io/neurodata-wiithout-barriers/
+repo_url: https://github.com/pushkarsingh019/neurodata-wiithout-barriers
+repo_name: pushkarsingh019/neurodata-wiithout-barriers
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: teal
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Shared Local Explorer: shared-local-explorer.md
+  - MCP Servers:
+      - Overview: mcps/index.md
+      - DANDI MCP: mcps/dandi.md
+      - OpenNeuro MCP: mcps/openneuro.md
+      - IBL MCP: mcps/ibl.md
+  - Reference:
+      - Tool Compatibility Matrix: reference/tool-compatibility.md
+      - MCP Harness: HARNESS.md
+  - Development: development.md
