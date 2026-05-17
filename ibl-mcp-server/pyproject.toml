@@ -1,0 +1,28 @@
+[project]
+name = "ibl-mcp-server"
+version = "0.1.0"
+description = "A rich Model Context Protocol server for discovering, understanding, and downloading International Brain Laboratory OpenAlyx data."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Neurodata Without Barriers contributors" }]
+dependencies = [
+  "httpx>=0.27.0",
+  "mcp[cli]>=1.27.0",
+  "numpy>=1.26.0",
+  "pydantic>=2.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[project.scripts]
+ibl-mcp = "ibl_mcp.server:main"
+
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ibl_mcp"]

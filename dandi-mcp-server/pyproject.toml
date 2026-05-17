@@ -1,0 +1,28 @@
+[project]
+name = "dandi-mcp-server"
+version = "0.1.0"
+description = "A read-only Model Context Protocol server for exploring DANDI Archive dandisets and assets."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Paper Lineage CLI contributors" }]
+dependencies = [
+  "httpx>=0.27.0",
+  "mcp[cli]>=1.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mkdocs>=1.6.0",
+  "mkdocs-material>=9.5.0",
+  "pytest>=8.0.0",
+]
+
+[project.scripts]
+dandi-mcp = "dandi_mcp.server:main"
+
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dandi_mcp"]

@@ -1,0 +1,61 @@
+site_name: DANDI MCP Server
+site_description: Extensive Model Context Protocol server for DANDI Archive datasets, metadata, assets, Zarr archives, and authenticated API workflows.
+site_url: https://example.local/dandi-mcp-server/
+repo_name: dandi-mcp-server
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.tabs.link
+  palette:
+    - scheme: default
+      primary: teal
+      accent: deep orange
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - MCP Client Setup: getting-started/client-setup.md
+      - Quickstart: getting-started/quickstart.md
+  - Guides:
+      - DANDI Concepts: guides/dandi-concepts.md
+      - Dataset Exploration: guides/dataset-exploration.md
+      - Authenticated Workflows: guides/authenticated-workflows.md
+      - Agent Workflows: guides/agent-workflows.md
+  - Reference:
+      - Tool Reference: reference/tools.md
+      - Resources and Prompts: reference/resources-prompts.md
+      - API Coverage: reference/api-coverage.md
+      - Raw API Coverage Matrix: API_COVERAGE.md
+      - Architecture Audit: ARCHITECTURE_AUDIT.md
+      - Configuration: reference/configuration.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Testing: development/testing.md

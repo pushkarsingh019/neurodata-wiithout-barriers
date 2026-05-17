@@ -1,0 +1,31 @@
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Environments and package-manager caches
+.venv/
+venv/
+env/
+.uv-cache/
+
+# Generated docs
+site/
+
+# Local editor and OS files
+.idea/
+.vscode/
+
+# Local VCS metadata backups
+.git-*-backup/
