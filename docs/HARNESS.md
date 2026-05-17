@@ -81,3 +81,13 @@ opencode run --model llamacpp/Qwen "$(cat harness/prompts/work_with_neurodata_da
 ```
 
 The prompt asks the agent to avoid large downloads and to distinguish MCP tool facts from interpretation.
+
+## OpenCode Visual Explorer Demo
+
+For the browser-launching dataset explorer demo, run OpenCode from the repository root:
+
+```bash
+opencode run --model llamacpp/Qwen "$(cat harness/prompts/demo_visualize_dandi_001097.md)"
+```
+
+The demo prompt requires the agent to call `generate_dataset_explorer` with `open_in_browser: true`, report the generated `html_path` and `file_url`, and avoid generating PNG plots unless the user explicitly asks for plots.

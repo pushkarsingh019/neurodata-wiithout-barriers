@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
+import webbrowser
 from pathlib import Path
 from typing import Any
 
@@ -570,8 +573,9 @@ def build_server() -> FastMCP:
         dataset_key_or_id: str,
         version_or_tag: str = "latest",
         include_papers: bool = True,
+        open_in_browser: bool = True,
     ) -> dict[str, Any]:
-        """Generate a static HTML explorer for an IBL/ALF dataset and its variables."""
+        """Generate and optionally launch a static HTML explorer for an IBL/ALF dataset."""
         del version_or_tag
         summary, variables = _ibl_explorer_data(local, client, dataset_key_or_id)
         papers = (
@@ -600,12 +604,21 @@ def build_server() -> FastMCP:
             "explorer_id": explorer_id,
             "dataset_key_or_id": dataset_key_or_id,
             "html_path": str(html_path),
+            "file_url": html_path.resolve().as_uri(),
+            "open_command": f"open {html_path}",
+            "agent_instruction": (
+                "If the user asked to visualize or explore the dataset, show/open this HTML explorer now. "
+                "Use plotting only when the user explicitly asks for a plot or analysis figure."
+            ),
+            "opened": False,
             "summary": {
                 "variable_count": len(variables),
                 "paper_count": len(papers),
                 "missing_pdf_count": len(literature.list_missing_pdfs(dataset_key_or_id).get("missing_pdfs", [])),
             },
         }
+        if open_in_browser:
+            result.update(_open_html_artifact(html_path))
         client.storage.upsert_record("dataset_explorer", explorer_id, result, source="neurodata_literature")
         return result
 
@@ -806,6 +819,17 @@ def _safe_call(call: Any, default: Any = None) -> Any:
         return call()
     except Exception:
         return default
+
+
+def _open_html_artifact(html_path: Path) -> dict[str, Any]:
+    try:
+        if sys.platform == "darwin":
+            subprocess.run(["open", str(html_path)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        else:
+            webbrowser.open(html_path.resolve().as_uri())
+        return {"opened": True, "open_error": None}
+    except Exception as exc:
+        return {"opened": False, "open_error": str(exc)}
 
 
 def _ibl_paper_hints(service: IBLDomainService, dataset_id: str) -> list[Any]:

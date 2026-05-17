@@ -1,5 +1,13 @@
 Use the configured MCP servers only.
 
+Important visual workflow rule:
+
+- If the user asks to visualize, visually explain, inspect, browse, or explore a dataset, call the relevant `generate_dataset_explorer` MCP tool first with `open_in_browser: true`.
+- After the tool returns, tell the user the `html_path`, `file_url`, `opened` status, and `summary.variable_count`.
+- Do not create PNG plots, matplotlib figures, notebooks, or ad hoc scripts unless the user explicitly asks for a plot or numerical analysis figure.
+- If `summary.variable_count` is `0`, say that the explorer was created but no variables were indexed, then use metadata/listing tools to explain why and what dependency/download is needed.
+- When the user clicks/selects a variable in the HTML explorer, use `explain_visual_dataset_selection` or `explain_dataset_variable` to answer with paper-aware uncertainty.
+
 I want to work with these neuroscience datasets or sessions:
 
 - DANDI dandiset: 000026
