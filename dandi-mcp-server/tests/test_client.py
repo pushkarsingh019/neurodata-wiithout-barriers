@@ -76,6 +76,17 @@ def test_call_api_can_reach_arbitrary_get_path() -> None:
     assert seen["query"] == "model=Dandiset"
 
 
+@pytest.mark.parametrize("bad_path", ["https://evil.example/api", "../users/me/", "dandisets/../users/me/"])
+def test_call_api_rejects_external_or_traversal_paths(bad_path: str) -> None:
+    client = DandiClient(
+        DandiClientConfig(api_base_url="https://example.test/api", api_token="secret"),
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json={})),
+    )
+
+    with pytest.raises(ValueError):
+        client.call_api("GET", bad_path)
+
+
 def test_api_token_sets_authorization_header() -> None:
     seen: dict[str, str] = {}
 

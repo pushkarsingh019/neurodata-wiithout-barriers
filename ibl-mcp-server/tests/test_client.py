@@ -88,6 +88,17 @@ def test_call_alyx_api_blocks_mutation_without_explicit_allow() -> None:
         client.call_alyx_api("PATCH", f"sessions/{SESSION_ID}/", body={"qc": "PASS"})
 
 
+@pytest.mark.parametrize("bad_path", ["https://evil.example/sessions", "../users", "sessions/../users"])
+def test_call_alyx_api_rejects_external_or_traversal_paths(bad_path: str) -> None:
+    client = IBLClient(
+        IBLClientConfig(alyx_base_url="https://openalyx.example.test", token="secret"),
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json={})),
+    )
+
+    with pytest.raises(ValueError):
+        client.call_alyx_api("GET", bad_path)
+
+
 def test_token_sets_authorization_header() -> None:
     seen: dict[str, str] = {}
 

@@ -12,7 +12,8 @@ from ibl_mcp.storage import MCPStorage
 
 DEFAULT_ALYX_BASE_URL = "https://openalyx.internationalbrainlab.org"
 DEFAULT_PUBLIC_USERNAME = "intbrainlab"
-DEFAULT_PUBLIC_PASSWORD = "international"
+# Documented public OpenAlyx account, not a private credential.
+DEFAULT_PUBLIC_PASSWORD = "international"  # nosec B105
 DEFAULT_DOWNLOAD_DIR = Path.home() / ".cache" / "ibl-mcp" / "downloads"
 MAX_PAGE_SIZE = 1000
 MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -409,7 +410,7 @@ class IBLClient:
             raise ValueError("method must be GET, OPTIONS, POST, PUT, PATCH, or DELETE")
         if method in MUTATING_METHODS and not allow_mutation:
             raise ValueError("mutating Alyx API calls require allow_mutation=True")
-        clean_path = path.lstrip("/")
+        clean_path = _relative_api_path(path.lstrip("/"))
         self._ensure_token()
         response = self._client.request(method, clean_path, params=query, json=body)
         return self._response_payload(response)
@@ -544,6 +545,19 @@ def _endpoint_path(value: str) -> str:
     if not value:
         raise ValueError("endpoint must not be empty")
     return quote(value, safe="-_")
+
+
+def _relative_api_path(value: str) -> str:
+    value = value.strip()
+    parsed = urlparse(value)
+    if parsed.scheme or parsed.netloc or not value:
+        raise ValueError("path must be a relative Alyx API path")
+    if "\\" in value:
+        raise ValueError("path must not contain backslashes")
+    parts = [part for part in value.split("/") if part]
+    if any(part in {".", ".."} for part in parts):
+        raise ValueError("path must not contain dot-directory segments")
+    return value
 
 
 def _uuid_like(value: str) -> str:

@@ -337,6 +337,7 @@ class DandiClient:
         clean_path = path.lstrip("/")
         if clean_path.startswith("api/"):
             clean_path = clean_path[4:]
+        clean_path = _relative_api_path(clean_path)
         response = self._client.request(method, clean_path, params=query, json=body)
         return self._response_payload(response)
 
@@ -349,7 +350,7 @@ class DandiClient:
     ) -> dict[str, Any]:
         metadata = self.get_version_metadata(dandiset_id, version)
         assets = self.list_assets(dandiset_id, version, page_size=min(sample_assets, 100))
-        return {
+        result = {
             "dandiset_id": dandiset_id,
             "version": version,
             "url": metadata.get("url"),
@@ -649,3 +650,16 @@ def _path_part(value: str) -> str:
     if not value:
         raise ValueError("path value must not be empty")
     return quote(value, safe="")
+
+
+def _relative_api_path(value: str) -> str:
+    value = value.strip()
+    parsed = urlparse(value)
+    if parsed.scheme or parsed.netloc or not value:
+        raise ValueError("path must be a relative DANDI API path")
+    if "\\" in value:
+        raise ValueError("path must not contain backslashes")
+    parts = [part for part in value.split("/") if part]
+    if any(part in {".", ".."} for part in parts):
+        raise ValueError("path must not contain dot-directory segments")
+    return value
