@@ -78,6 +78,7 @@ class IBLDomainService:
             "behavioral_modalities": sorted(mod for mod in modalities if mod in {"trials", "wheel", "licks", "video", "pose", "pupil"}),
             "knowledge_graph_edges": session_graph_edges(session, dataset_rows, insertion_rows),
         }
+        self.client.storage.upsert_record("session", session_id, data, source="OpenAlyx sessions/datasets/insertions")
         return self._envelope(data, endpoint="sessions/datasets/insertions", session_id=session_id, qc=qc).model_dump_plain()
 
     def get_session_datasets(self, session_id: str, modality: str | None = None) -> dict[str, Any]:
@@ -91,6 +92,7 @@ class IBLDomainService:
             "inventory": summarize_dataset_inventory(datasets),
             "datasets": datasets,
         }
+        self.client.storage.upsert_record("session_datasets", session_id, data, source="OpenAlyx datasets")
         warnings = availability_warnings(datasets, modality=modality)
         return self._envelope(data, endpoint="datasets", session_id=session_id, qc=warnings).model_dump_plain()
 
@@ -234,6 +236,12 @@ class IBLDomainService:
 
     def get_related_papers(self, query: str = "", project: str = "", dataset_type: str = "") -> dict[str, Any]:
         data = {"papers": related_publications(query=query, project=project, dataset_type=dataset_type)}
+        self.client.storage.upsert_record(
+            "papers",
+            f"{query}:{project}:{dataset_type}",
+            data,
+            source="IBL static publication registry",
+        )
         return self._envelope(data, endpoint="static_publication_registry").model_dump_plain()
 
     def get_associated_code(self, query: str = "", project: str = "") -> dict[str, Any]:
@@ -244,10 +252,16 @@ class IBLDomainService:
 
     def semantic_search(self, query: str, limit: int = 10) -> dict[str, Any]:
         data = lexical_semantic_search(query, limit=limit)
+        self.client.storage.upsert_record("semantic_search", query, data, source="IBL lexical semantic index")
         return self._envelope(data, endpoint="local_semantic_index").model_dump_plain()
 
     def query_knowledge_graph(self, entity_type: str | None = None, predicate: str | None = None, value: str | None = None, limit: int = 25) -> dict[str, Any]:
         data = query_static_graph(entity_type=entity_type, predicate=predicate, value=value, limit=limit)
+        self.client.storage.replace_graph(
+            "ibl:static",
+            data.get("nodes", []),
+            data.get("edges", []),
+        )
         return self._envelope(data, endpoint="local_knowledge_graph").model_dump_plain()
 
     def _subject_from_session(self, session: dict[str, Any]) -> Any:
@@ -280,7 +294,7 @@ class IBLDomainService:
                 if require_all:
                     warnings.append(QCWarning(risk="warning", code="dataset_missing", message=f"Missing expected dataset {pattern}.", affected=[pattern]))
                 continue
-            dataset_id = str(row.get("id", ""))
+            dataset_id = record_id(row)
             if dataset_id:
                 dataset_ids.append(dataset_id)
             urls = self.client.get_dataset_download_urls(dataset_id).get("download_urls", []) if dataset_id else []
@@ -333,6 +347,16 @@ def _rows(payload: dict[str, Any] | list[Any]) -> list[dict[str, Any]]:
 
 def dataset_name(row: dict[str, Any]) -> str:
     return str(row.get("name") or row.get("dataset_type") or row.get("file_records", "") or "")
+
+
+def record_id(row: dict[str, Any]) -> str:
+    value = row.get("id")
+    if value:
+        return str(value)
+    url = str(row.get("url", "")).rstrip("/")
+    if url:
+        return url.rsplit("/", 1)[-1]
+    return ""
 
 
 def dataset_matches_any(row: dict[str, Any], patterns: list[str]) -> bool:
@@ -538,8 +562,9 @@ def session_graph_edges(session: dict[str, Any], datasets: list[dict[str, Any]],
         if session.get(key):
             edges.append({"source": f"session:{session_id}", "predicate": f"has_{key}", "target": str(session[key])})
     for row in datasets[:200]:
-        if row.get("id"):
-            edges.append({"source": f"session:{session_id}", "predicate": "has_dataset", "target": f"dataset:{row['id']}"})
+        dataset_id = record_id(row)
+        if dataset_id:
+            edges.append({"source": f"session:{session_id}", "predicate": "has_dataset", "target": f"dataset:{dataset_id}"})
     for row in insertions:
         if row.get("id"):
             edges.append({"source": f"session:{session_id}", "predicate": "has_probe_insertion", "target": f"insertion:{row['id']}"})

@@ -9,6 +9,7 @@ def test_server_exposes_broad_dandi_tool_surface() -> None:
     tools = {tool.name for tool in asyncio.run(mcp.list_tools())}
 
     expected = {
+        "get_storage_info",
         "search_dandisets",
         "get_dandiset",
         "list_dandiset_versions",

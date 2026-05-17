@@ -40,7 +40,7 @@ def test_behavior_summary_loads_trial_arrays_and_surfaces_qc() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.path
-        if path == "/datasets/":
+        if path == "/datasets":
             return httpx.Response(
                 200,
                 json=[
@@ -51,7 +51,7 @@ def test_behavior_summary_loads_trial_arrays_and_surfaces_qc() -> None:
         if path.startswith("/datasets/"):
             dataset_id = path.strip("/").split("/")[1]
             return httpx.Response(200, json={"id": dataset_id, "data_url": f"https://objects.example.test/{dataset_id}.npy"})
-        if path == "/files/":
+        if path == "/files":
             dataset_id = request.url.params.get("dataset")
             return httpx.Response(200, json=[{"data_url": f"https://objects.example.test/{dataset_id}.npy"}])
         if request.url.host == "objects.example.test":

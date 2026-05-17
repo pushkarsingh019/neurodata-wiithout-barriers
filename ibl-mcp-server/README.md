@@ -54,7 +54,7 @@ uv run mcp dev src/ibl_mcp/server.py
 | `IBL_ALYX_BASE_URL` | Alyx/OpenAlyx base URL. Defaults to `https://openalyx.internationalbrainlab.org`. |
 | `IBL_ALYX_TIMEOUT` | HTTP timeout in seconds. Defaults to `45`. |
 | `IBL_ALYX_TOKEN` | Optional Alyx token for authenticated servers. |
-| `IBL_ALYX_USERNAME`, `IBL_ALYX_PASSWORD` | Optional basic auth credentials when a token is not provided. |
+| `IBL_ALYX_USERNAME`, `IBL_ALYX_PASSWORD` | Alyx credentials used to mint a token when `IBL_ALYX_TOKEN` is absent. Defaults to the documented public OpenAlyx account: `intbrainlab` / `international`. |
 | `IBL_MCP_DOWNLOAD_DIR` | Directory for `download_url`. Defaults to `~/.cache/ibl-mcp/downloads`. |
 
 ## Tools
@@ -139,6 +139,10 @@ Find datasets in probe collections for one session:
 ```bash
 uv --cache-dir .uv-cache run --extra dev pytest
 ```
+
+## Live Smoke Test
+
+The current implementation was verified against OpenAlyx by resolving and downloading `_ibl_trials.choice.npy` from session `f8787d77-74f9-41c2-bdd6-a1cbd420091a`. The downloaded file was 1,800 bytes and loaded as a NumPy array with shape `(209,)`.
 
 ## Audit And Roadmap
 

@@ -23,6 +23,11 @@ def build_server() -> FastMCP:
     client = _client_from_env()
 
     @mcp.tool()
+    def get_storage_info() -> dict[str, Any]:
+        """Return the standardized local storage paths and schema for this MCP server."""
+        return client.storage.describe()
+
+    @mcp.tool()
     def search_dandisets(
         search: str | None = None,
         page: int = 1,

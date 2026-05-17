@@ -24,6 +24,11 @@ def build_server() -> FastMCP:
     service = OpenNeuroSemanticService(_client_from_env())
 
     @mcp.tool()
+    def get_storage_info() -> dict[str, Any]:
+        """Return the standardized local storage paths and schema for this MCP server."""
+        return service.storage.describe()
+
+    @mcp.tool()
     def search_datasets(query: str | None = None, page_size: int = 25, after: str | None = None) -> dict[str, Any]:
         """Keyword search or list OpenNeuro datasets with cursor pagination."""
         return service.search_datasets(query, page_size=page_size, after=after)

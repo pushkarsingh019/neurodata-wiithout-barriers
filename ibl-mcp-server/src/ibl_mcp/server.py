@@ -6,8 +6,15 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ibl_mcp.client import DEFAULT_ALYX_BASE_URL, IBLClient, IBLClientConfig
+from ibl_mcp.client import (
+    DEFAULT_ALYX_BASE_URL,
+    DEFAULT_PUBLIC_PASSWORD,
+    DEFAULT_PUBLIC_USERNAME,
+    IBLClient,
+    IBLClientConfig,
+)
 from ibl_mcp.services import IBLDomainService
+from ibl_mcp.storage import MCPStorage
 
 
 def build_server() -> FastMCP:
@@ -24,6 +31,11 @@ def build_server() -> FastMCP:
     )
     client = _client_from_env()
     service = IBLDomainService(client)
+
+    @mcp.tool()
+    def get_storage_info() -> dict[str, Any]:
+        """Return the standardized local storage paths and schema for this MCP server."""
+        return client.storage.describe()
 
     @mcp.tool()
     def list_alyx_endpoints() -> dict[str, Any]:
@@ -567,14 +579,16 @@ def build_server() -> FastMCP:
 
 
 def _client_from_env() -> IBLClient:
-    download_dir = Path(os.environ.get("IBL_MCP_DOWNLOAD_DIR", str(Path.home() / ".cache" / "ibl-mcp" / "downloads")))
+    storage = MCPStorage.from_env("ibl")
+    download_dir = Path(os.environ.get("IBL_MCP_DOWNLOAD_DIR", str(storage.config.downloads_dir)))
     config = IBLClientConfig(
         alyx_base_url=os.environ.get("IBL_ALYX_BASE_URL", DEFAULT_ALYX_BASE_URL),
         timeout=float(os.environ.get("IBL_ALYX_TIMEOUT", "45")),
-        username=os.environ.get("IBL_ALYX_USERNAME"),
-        password=os.environ.get("IBL_ALYX_PASSWORD"),
+        username=os.environ.get("IBL_ALYX_USERNAME", DEFAULT_PUBLIC_USERNAME),
+        password=os.environ.get("IBL_ALYX_PASSWORD", DEFAULT_PUBLIC_PASSWORD),
         token=os.environ.get("IBL_ALYX_TOKEN"),
         download_dir=download_dir,
+        storage=storage,
     )
     return IBLClient(config)
 

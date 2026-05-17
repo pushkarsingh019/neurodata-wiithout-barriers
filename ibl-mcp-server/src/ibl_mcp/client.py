@@ -7,8 +7,12 @@ from urllib.parse import quote, urlparse
 
 import httpx
 
+from ibl_mcp.storage import MCPStorage
+
 
 DEFAULT_ALYX_BASE_URL = "https://openalyx.internationalbrainlab.org"
+DEFAULT_PUBLIC_USERNAME = "intbrainlab"
+DEFAULT_PUBLIC_PASSWORD = "international"
 DEFAULT_DOWNLOAD_DIR = Path.home() / ".cache" / "ibl-mcp" / "downloads"
 MAX_PAGE_SIZE = 1000
 MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -25,7 +29,8 @@ class IBLClientConfig:
     username: str | None = None
     password: str | None = None
     token: str | None = None
-    download_dir: Path = DEFAULT_DOWNLOAD_DIR
+    download_dir: Path | None = None
+    storage: MCPStorage | None = None
 
 
 class IBLClient:
@@ -38,12 +43,16 @@ class IBLClient:
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.config = config or IBLClientConfig()
+        self.storage = self.config.storage or MCPStorage.from_env("ibl")
+        if self.config.download_dir is None:
+            object.__setattr__(self.config, "download_dir", self.storage.config.downloads_dir)
+        self._transport = transport
         headers = {"User-Agent": "ibl-mcp-server/0.1.0"}
         if self.config.token:
             headers["Authorization"] = f"Token {self.config.token}"
         auth = None
         if self.config.username and self.config.password and not self.config.token:
-            auth = (self.config.username, self.config.password)
+            auth = None
         self._client = httpx.Client(
             base_url=self.config.alyx_base_url.rstrip("/") + "/",
             timeout=self.config.timeout,
@@ -52,13 +61,14 @@ class IBLClient:
             headers=headers,
             auth=auth,
         )
+        self._token_initialized = bool(self.config.token)
 
     def close(self) -> None:
         self._client.close()
 
     def list_endpoints(self) -> dict[str, Any]:
         """Return all endpoints advertised by this Alyx instance."""
-        return self._get("")
+        return self._get("api/schema", params={"format": "json"})
 
     def describe_endpoint(self, endpoint: str) -> dict[str, Any]:
         """Return OPTIONS metadata for an endpoint where the server exposes it."""
@@ -84,10 +94,10 @@ class IBLClient:
         page_size: int | None = None,
     ) -> dict[str, Any] | list[Any]:
         """List sessions using common ONE/Alyx public search filters."""
-        return self._get("sessions/", params=_clean_params(locals()))
+        return self._get("sessions", params=_clean_params(locals()))
 
     def get_session(self, session_id: str) -> dict[str, Any]:
-        return self._get(f"sessions/{_uuid_like(session_id)}/")
+        return self._get(f"sessions/{_uuid_like(session_id)}")
 
     def list_datasets(
         self,
@@ -102,10 +112,10 @@ class IBLClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any] | list[Any]:
-        return self._get("datasets/", params=_clean_params(locals()))
+        return self._get("datasets", params=_clean_params(locals()))
 
     def get_dataset(self, dataset_id: str) -> dict[str, Any]:
-        return self._get(f"datasets/{_uuid_like(dataset_id)}/")
+        return self._get(f"datasets/{_uuid_like(dataset_id)}")
 
     def list_files(
         self,
@@ -117,7 +127,7 @@ class IBLClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any] | list[Any]:
-        return self._get("files/", params=_clean_params(locals()))
+        return self._get("files", params=_clean_params(locals()))
 
     def list_insertions(
         self,
@@ -134,10 +144,10 @@ class IBLClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any] | list[Any]:
-        return self._get("insertions/", params=_clean_params(locals()))
+        return self._get("insertions", params=_clean_params(locals()))
 
     def get_insertion(self, insertion_id: str) -> dict[str, Any]:
-        return self._get(f"insertions/{_uuid_like(insertion_id)}/")
+        return self._get(f"insertions/{_uuid_like(insertion_id)}")
 
     def list_trajectories(
         self,
@@ -148,7 +158,7 @@ class IBLClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any] | list[Any]:
-        return self._get("trajectories/", params=_clean_params(locals()))
+        return self._get("trajectories", params=_clean_params(locals()))
 
     def list_channels(
         self,
@@ -161,7 +171,7 @@ class IBLClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any] | list[Any]:
-        return self._get("channels/", params=_clean_params(locals()))
+        return self._get("channels", params=_clean_params(locals()))
 
     def list_subjects(
         self,
@@ -173,7 +183,7 @@ class IBLClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any] | list[Any]:
-        return self._get("subjects/", params=_clean_params(locals()))
+        return self._get("subjects", params=_clean_params(locals()))
 
     def list_brain_regions(
         self,
@@ -184,7 +194,7 @@ class IBLClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any] | list[Any]:
-        return self._get("brain-regions/", params=_clean_params(locals()))
+        return self._get("brain-regions", params=_clean_params(locals()))
 
     def list_dataset_types(
         self,
@@ -194,7 +204,7 @@ class IBLClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any] | list[Any]:
-        return self._get("dataset-types/", params=_clean_params(locals()))
+        return self._get("dataset-types", params=_clean_params(locals()))
 
     def list_data_formats(
         self,
@@ -204,16 +214,16 @@ class IBLClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any] | list[Any]:
-        return self._get("data-formats/", params=_clean_params(locals()))
+        return self._get("data-formats", params=_clean_params(locals()))
 
     def list_tags(self, *, name: str | None = None) -> dict[str, Any] | list[Any]:
-        return self._get("tags/", params=_clean_params(locals()))
+        return self._get("tags", params=_clean_params(locals()))
 
     def list_labs(self, *, name: str | None = None) -> dict[str, Any] | list[Any]:
-        return self._get("labs/", params=_clean_params(locals()))
+        return self._get("labs", params=_clean_params(locals()))
 
     def list_projects(self, *, name: str | None = None) -> dict[str, Any] | list[Any]:
-        return self._get("projects/", params=_clean_params(locals()))
+        return self._get("projects", params=_clean_params(locals()))
 
     def list_task_protocols(
         self,
@@ -252,7 +262,7 @@ class IBLClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any] | list[Any]:
-        return self._get("revisions/", params=_clean_params(locals()))
+        return self._get("revisions", params=_clean_params(locals()))
 
     def list_downloads(
         self,
@@ -262,7 +272,7 @@ class IBLClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any] | list[Any]:
-        return self._get("downloads/", params=_clean_params(locals()))
+        return self._get("downloads", params=_clean_params(locals()))
 
     def list_tasks(
         self,
@@ -275,10 +285,10 @@ class IBLClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any] | list[Any]:
-        return self._get("tasks/", params=_clean_params(locals()))
+        return self._get("tasks", params=_clean_params(locals()))
 
     def get_cache_info(self) -> dict[str, Any]:
-        return self._get("cache/")
+        return self._get("cache")
 
     def get_cache_zip_url(self) -> dict[str, Any]:
         return self._redirect_url("cache.zip")
@@ -313,19 +323,19 @@ class IBLClient:
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("url must be an absolute http(s) URL")
-        response = self._client.get(url)
+        name = filename or Path(parsed.path).name or "ibl-download.bin"
+        destination = _safe_download_path(self.config.download_dir, name)
+        response = self._download_client_get(url)
         if response.status_code in {301, 302, 303, 307, 308}:
             location = response.headers.get("location")
             if not location:
                 raise AlyxAPIError("Redirect response did not include a location header")
-            response = self._client.get(location)
+            response = self._download_client_get(location)
         if not response.is_success:
             self._raise_for_response(response)
         content_length = response.headers.get("content-length")
         if content_length and int(content_length) > max_bytes:
             raise ValueError(f"download is larger than max_bytes ({max_bytes})")
-        name = filename or Path(parsed.path).name or "ibl-download.bin"
-        destination = _safe_download_path(self.config.download_dir, name)
         self.config.download_dir.mkdir(parents=True, exist_ok=True)
         total = 0
         with destination.open("wb") as stream:
@@ -335,24 +345,26 @@ class IBLClient:
                     destination.unlink(missing_ok=True)
                     raise ValueError(f"download exceeded max_bytes ({max_bytes})")
                 stream.write(chunk)
-        return {
+        result = {
             "path": str(destination),
             "bytes": total,
             "source_url": url,
             "content_type": response.headers.get("content-type"),
         }
+        self.storage.upsert_record("download", str(destination), result, source="IBL explicit URL download")
+        return result
 
     def get_url_bytes(self, url: str, *, max_bytes: int = 200_000_000) -> tuple[bytes, dict[str, str | None]]:
         """Fetch an explicit URL into memory for small analysis arrays."""
         parsed = urlparse(url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("url must be an absolute http(s) URL")
-        response = self._client.get(url)
+        response = self._download_client_get(url)
         if response.status_code in {301, 302, 303, 307, 308}:
             location = response.headers.get("location")
             if not location:
                 raise AlyxAPIError("Redirect response did not include a location header")
-            response = self._client.get(location)
+            response = self._download_client_get(location)
         if not response.is_success:
             self._raise_for_response(response)
         content_length = response.headers.get("content-length")
@@ -398,16 +410,43 @@ class IBLClient:
         if method in MUTATING_METHODS and not allow_mutation:
             raise ValueError("mutating Alyx API calls require allow_mutation=True")
         clean_path = path.lstrip("/")
+        self._ensure_token()
         response = self._client.request(method, clean_path, params=query, json=body)
         return self._response_payload(response)
 
     def _get(
         self, path: str, *, params: dict[str, Any] | None = None
     ) -> dict[str, Any] | list[Any]:
+        self._ensure_token()
         response = self._client.get(path, params=params)
         return self._response_payload(response)
 
+    def _create_auth_token(self, username: str, password: str) -> str:
+        response = self._client.post("auth-token", json={"username": username, "password": password})
+        payload = self._response_payload(response)
+        if not isinstance(payload, dict) or not payload.get("token"):
+            raise AlyxAPIError("Alyx auth-token response did not include a token")
+        return str(payload["token"])
+
+    def _ensure_token(self) -> None:
+        if self._token_initialized or not (self.config.username and self.config.password):
+            return
+        token = self._create_auth_token(self.config.username, self.config.password)
+        self._client.headers["Authorization"] = f"Token {token}"
+        self._token_initialized = True
+
+    def _download_client_get(self, url: str) -> httpx.Response:
+        """Fetch data URLs without leaking Alyx Authorization headers to object storage."""
+        with httpx.Client(
+            timeout=self.config.timeout,
+            follow_redirects=False,
+            headers={"User-Agent": "ibl-mcp-server/0.1.0"},
+            transport=self._transport,
+        ) as client:
+            return client.get(url)
+
     def _redirect_url(self, path: str) -> dict[str, Any]:
+        self._ensure_token()
         response = self._client.get(path)
         if response.status_code in {301, 302, 303, 307, 308}:
             location = response.headers.get("location")
@@ -444,18 +483,24 @@ class IBLClient:
 
 def _clean_params(values: dict[str, Any]) -> dict[str, Any]:
     values.pop("self", None)
+    page = values.pop("page", None)
+    page_size = values.pop("page_size", None)
     params: dict[str, Any] = {}
     for key, value in values.items():
         if value is None:
             continue
         if isinstance(value, bool):
             params[key] = "true" if value else "false"
-        elif key == "page_size":
-            params[key] = min(_positive_int(int(value), key), MAX_PAGE_SIZE)
-        elif key == "page":
-            params[key] = _positive_int(int(value), key)
         else:
             params[key] = value
+    if page_size is not None:
+        limit = min(_positive_int(int(page_size), "page_size"), MAX_PAGE_SIZE)
+        params["limit"] = limit
+        if page is not None:
+            params["offset"] = (_positive_int(int(page), "page") - 1) * limit
+    elif page is not None:
+        page_value = _positive_int(int(page), "page")
+        params["offset"] = (page_value - 1) * 250
     return params
 
 
@@ -498,7 +543,7 @@ def _endpoint_path(value: str) -> str:
     value = value.strip().strip("/")
     if not value:
         raise ValueError("endpoint must not be empty")
-    return quote(value, safe="-_") + "/"
+    return quote(value, safe="-_")
 
 
 def _uuid_like(value: str) -> str:

@@ -13,6 +13,7 @@ from dandi_mcp.intelligence import (
     semantic_rank,
     summarize_neuroscience_metadata,
 )
+from dandi_mcp.storage import MCPStorage
 
 
 DEFAULT_API_BASE_URL = "https://api.dandiarchive.org/api"
@@ -28,6 +29,7 @@ class DandiClientConfig:
     api_base_url: str = DEFAULT_API_BASE_URL
     timeout: float = 30.0
     api_token: str | None = None
+    storage: MCPStorage | None = None
 
 
 class DandiClient:
@@ -40,6 +42,7 @@ class DandiClient:
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.config = config or DandiClientConfig()
+        self.storage = self.config.storage or MCPStorage.from_env("dandi")
         headers = {"User-Agent": "dandi-mcp-server/0.1.0"}
         if self.config.api_token:
             headers["Authorization"] = f"token {self.config.api_token}"
@@ -184,13 +187,15 @@ class DandiClient:
         location = response.headers.get("location")
         if not location:
             raise DandiAPIError("DANDI did not return a download redirect location")
-        return {
+        result = {
             "asset_id": asset_id,
             "download_url": location,
             "content_disposition": content_disposition,
             "host": urlparse(location).netloc,
             "note": "DANDI download URLs are redirects to object storage and may expire.",
         }
+        self.storage.upsert_record("download_url", asset_id, result, source="DANDI asset download redirect")
+        return result
 
     def get_version_asset_download_url(
         self,
@@ -206,7 +211,7 @@ class DandiClient:
         location = response.headers.get("location")
         if not location:
             raise DandiAPIError("DANDI did not return a download redirect location")
-        return {
+        result = {
             "dandiset_id": dandiset_id,
             "version": version,
             "asset_id": asset_id,
@@ -214,6 +219,14 @@ class DandiClient:
             "host": urlparse(location).netloc,
             "note": "DANDI download URLs are redirects to object storage and may expire.",
         }
+        self.storage.upsert_record(
+            "download_url",
+            asset_id,
+            result,
+            source="DANDI asset download redirect",
+            version=version,
+        )
+        return result
 
     def get_version_info(self, dandiset_id: str, version: str = "draft") -> dict[str, Any]:
         return self._get(f"dandisets/{_dandiset_id(dandiset_id)}/versions/{_version(version)}/info/")
@@ -354,6 +367,14 @@ class DandiClient:
                 "next": assets.get("next"),
             },
         }
+        self.storage.upsert_record(
+            "dataset_summary",
+            _dandiset_id(dandiset_id),
+            result,
+            source="DANDI REST API",
+            version=version,
+        )
+        return result
 
     def analyze_dandiset_neuroscience(
         self,
@@ -369,11 +390,19 @@ class DandiClient:
             page_size=min(sample_assets, MAX_PAGE_SIZE),
             metadata=True,
         )
-        return summarize_neuroscience_metadata(metadata, assets.get("results", []))
+        result = summarize_neuroscience_metadata(metadata, assets.get("results", []))
+        self.storage.upsert_record(
+            "neuroscience_summary",
+            _dandiset_id(dandiset_id),
+            result,
+            source="DANDI metadata intelligence",
+            version=version,
+        )
+        return result
 
     def get_related_papers(self, dandiset_id: str, version: str = "draft") -> dict[str, Any]:
         metadata = self.get_version_metadata(dandiset_id, version)
-        return {
+        result = {
             "dandiset_id": dandiset_id,
             "version": version,
             "papers": extract_literature_links(metadata),
@@ -386,6 +415,14 @@ class DandiClient:
                 ),
             },
         }
+        self.storage.upsert_record(
+            "papers",
+            _dandiset_id(dandiset_id),
+            result,
+            source="DANDI version metadata",
+            version=version,
+        )
+        return result
 
     def semantic_search_dandisets(
         self,
@@ -400,6 +437,15 @@ class DandiClient:
             page_size=min(candidate_count, MAX_PAGE_SIZE),
         ).get("results", [])
         records = [self._candidate_record(candidate) for candidate in candidates]
+        for record in records:
+            record_id = str(record.get("identifier") or record.get("id") or "")
+            if record_id:
+                self.storage.upsert_record(
+                    "dataset_candidate",
+                    record_id,
+                    record,
+                    source="DANDI keyword search",
+                )
         matches = semantic_rank(query, records, limit=limit)
         return {
             "query": query,
@@ -486,7 +532,13 @@ class DandiClient:
             page_size=min(sample_assets, MAX_PAGE_SIZE),
             metadata=True,
         )
-        return build_knowledge_graph(metadata, assets.get("results", []))
+        graph = build_knowledge_graph(metadata, assets.get("results", []))
+        self.storage.replace_graph(
+            f"dandiset:{_dandiset_id(dandiset_id)}:{version}",
+            graph.get("nodes", []),
+            graph.get("edges", []),
+        )
+        return graph
 
     def query_dandiset_knowledge_graph(
         self,

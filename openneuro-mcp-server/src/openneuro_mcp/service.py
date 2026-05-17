@@ -15,11 +15,13 @@ from openneuro_mcp.embeddings import InMemoryVectorIndex, embed_text
 from openneuro_mcp.graph import NeuroscienceKnowledgeGraph
 from openneuro_mcp.models import Citation, DatasetMetadata, Modality, Species
 from openneuro_mcp.ontology import infer_modalities, infer_paradigms, infer_species
+from openneuro_mcp.storage import MCPStorage
 
 
 class OpenNeuroSemanticService:
-    def __init__(self, client: OpenNeuroClient) -> None:
+    def __init__(self, client: OpenNeuroClient, storage: MCPStorage | None = None) -> None:
         self.client = client
+        self.storage = storage or MCPStorage.from_env("openneuro")
         self.vector_index = InMemoryVectorIndex()
         self.graph = NeuroscienceKnowledgeGraph()
 
@@ -215,5 +217,22 @@ class OpenNeuroSemanticService:
                 " ".join(modality.value for modality in metadata.modalities),
             ]
         )
-        self.vector_index.upsert(metadata.id, text, {"name": metadata.name, "modalities": [item.value for item in metadata.modalities]})
+        payload = {"name": metadata.name, "modalities": [item.value for item in metadata.modalities]}
+        self.vector_index.upsert(metadata.id, text, payload)
+        self.storage.upsert_record(
+            "dataset",
+            metadata.id,
+            metadata.model_dump(mode="json"),
+            source="OpenNeuro GraphQL and BIDS metadata",
+            version=metadata.version,
+        )
+        self.storage.upsert_embedding(
+            "dataset",
+            metadata.id,
+            embed_text(text),
+            model="local-hashing-384",
+            payload=payload,
+        )
         self.graph.ingest_dataset(metadata)
+        graph = self.graph.query(limit=10_000)
+        self.storage.replace_graph("openneuro:semantic", graph.get("nodes", []), graph.get("edges", []))

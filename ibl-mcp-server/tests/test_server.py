@@ -9,6 +9,7 @@ def test_server_exposes_rich_ibl_tool_surface() -> None:
     tools = {tool.name for tool in asyncio.run(mcp.list_tools())}
 
     expected = {
+        "get_storage_info",
         "list_alyx_endpoints",
         "describe_alyx_endpoint",
         "search_sessions",

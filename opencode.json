@@ -1,0 +1,50 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "dandi": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "uv",
+        "--directory",
+        "/Users/pushkar_nairlab/Documents/03_side_projects/neurodata-without-barriers/dandi-mcp-server",
+        "run",
+        "dandi-mcp"
+      ],
+      "environment": {
+        "UV_CACHE_DIR": "/Users/pushkar_nairlab/Documents/03_side_projects/neurodata-without-barriers/dandi-mcp-server/.uv-cache",
+        "NEURODATA_MCP_STORAGE_DIR": "/Users/pushkar_nairlab/Documents/03_side_projects/neurodata-without-barriers/.mcp-storage"
+      }
+    },
+    "ibl": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "uv",
+        "--directory",
+        "/Users/pushkar_nairlab/Documents/03_side_projects/neurodata-without-barriers/ibl-mcp-server",
+        "run",
+        "ibl-mcp"
+      ],
+      "environment": {
+        "UV_CACHE_DIR": "/Users/pushkar_nairlab/Documents/03_side_projects/neurodata-without-barriers/ibl-mcp-server/.uv-cache",
+        "NEURODATA_MCP_STORAGE_DIR": "/Users/pushkar_nairlab/Documents/03_side_projects/neurodata-without-barriers/.mcp-storage"
+      }
+    },
+    "openneuro": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "uv",
+        "--directory",
+        "/Users/pushkar_nairlab/Documents/03_side_projects/neurodata-without-barriers/openneuro-mcp-server",
+        "run",
+        "openneuro-mcp"
+      ],
+      "environment": {
+        "UV_CACHE_DIR": "/Users/pushkar_nairlab/Documents/03_side_projects/neurodata-without-barriers/openneuro-mcp-server/.uv-cache",
+        "NEURODATA_MCP_STORAGE_DIR": "/Users/pushkar_nairlab/Documents/03_side_projects/neurodata-without-barriers/.mcp-storage"
+      }
+    }
+  }
+}

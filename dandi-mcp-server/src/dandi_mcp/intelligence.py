@@ -37,7 +37,7 @@ ONTOLOGY: dict[str, dict[str, tuple[str, ...]]] = {
     "species": {
         "mouse": ("mouse", "mice", "mus musculus"),
         "rat": ("rat", "rats", "rattus"),
-        "human": ("human", "humans", "homo sapiens", "participant"),
+        "human": ("human", "humans", "homo sapiens"),
         "macaque": ("macaque", "macaca", "non-human primate", "nonhuman primate"),
         "zebrafish": ("zebrafish", "danio rerio"),
         "drosophila": ("drosophila", "fruit fly"),
@@ -80,6 +80,8 @@ ONTOLOGY: dict[str, dict[str, tuple[str, ...]]] = {
         "social behavior": ("social", "interaction", "aggression", "courtship"),
         "grooming": ("grooming", "self-groom", "self grooming"),
         "navigation": ("navigation", "maze", "spatial", "virtual reality", "vr"),
+        "object manipulation": ("string pulling", "reaching", "forelimb", "grasping"),
+        "pose estimation": ("pose estimation", "markerless tracking", "deeplabcut", "sleap"),
         "sensory stimulation": ("stimulus", "stimuli", "visual", "auditory", "odor", "somatosensory"),
     },
     "brain_regions": {

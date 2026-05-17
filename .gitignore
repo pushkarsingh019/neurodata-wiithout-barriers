@@ -19,6 +19,7 @@ build/
 venv/
 env/
 .uv-cache/
+.mcp-storage/
 
 # Generated docs
 site/

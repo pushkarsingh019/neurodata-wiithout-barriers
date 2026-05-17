@@ -25,3 +25,14 @@ Run tests from an individual project directory:
 ```bash
 uv run pytest
 ```
+
+## MCP Harness
+
+Use the root harness scripts to connect all three servers from MCP clients such as Claude Desktop, Codex-style agents, and OpenCode-style local runners:
+
+```bash
+python harness/check_servers.py
+python harness/generate_mcp_config.py --format mcp-json
+```
+
+See [docs/HARNESS.md](docs/HARNESS.md) for generated config formats and recommended usage.

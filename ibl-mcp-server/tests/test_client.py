@@ -34,18 +34,18 @@ def test_search_sessions_builds_common_one_query() -> None:
     )
 
     assert result == []
-    assert seen["url"].startswith("https://openalyx.example.test/sessions/")
+    assert seen["url"].startswith("https://openalyx.example.test/sessions")
     assert "lab=cortexlab" in seen["url"]
     assert "datasets=spikes.times.npy" in seen["url"]
     assert "atlas_acronym=VISp" in seen["url"]
     assert "django=project__name__icontains%2Cbrainwide" in seen["url"]
-    assert "page=2" in seen["url"]
-    assert "page_size=1000" in seen["url"]
+    assert "limit=1000" in seen["url"]
+    assert "offset=1000" in seen["url"]
 
 
 def test_dataset_download_urls_collects_nested_file_urls() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path == f"/datasets/{DATASET_ID}/":
+        if request.url.path == f"/datasets/{DATASET_ID}":
             return httpx.Response(
                 200,
                 json={
@@ -54,7 +54,7 @@ def test_dataset_download_urls_collects_nested_file_urls() -> None:
                     "data_url": "https://ibl.flatironinstitute.org/file-a.npy",
                 },
             )
-        if request.url.path == "/files/":
+        if request.url.path == "/files":
             return httpx.Response(
                 200,
                 json=[
@@ -104,9 +104,32 @@ def test_token_sets_authorization_header() -> None:
     assert seen["authorization"] == "Token secret"
 
 
+def test_username_password_fetches_token_and_uses_token_auth() -> None:
+    seen: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth-token":
+            assert request.method == "POST"
+            return httpx.Response(200, json={"token": "minted"})
+        seen["authorization"] = request.headers["authorization"]
+        return httpx.Response(200, json={"ok": True})
+
+    client = IBLClient(
+        IBLClientConfig(
+            alyx_base_url="https://openalyx.example.test",
+            username="intbrainlab",
+            password="international",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+
+    assert client.list_labs() == {"ok": True}
+    assert seen["authorization"] == "Token minted"
+
+
 def test_list_task_protocols_derives_protocol_counts_from_sessions() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/sessions/"
+        assert request.url.path == "/sessions"
         return httpx.Response(
             200,
             json=[
@@ -142,6 +165,32 @@ def test_download_url_writes_inside_configured_download_dir(tmp_path: Path) -> N
     assert result["bytes"] == 5
     assert Path(result["path"]).read_bytes() == b"hello"
     assert Path(result["path"]).parent == tmp_path.resolve()
+
+
+def test_download_url_does_not_send_alyx_token_to_object_storage(tmp_path: Path) -> None:
+    seen: dict[str, str | None] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth-token":
+            return httpx.Response(200, json={"token": "minted"})
+        seen["authorization"] = request.headers.get("authorization")
+        return httpx.Response(200, content=b"hello")
+
+    client = IBLClient(
+        IBLClientConfig(
+            alyx_base_url="https://openalyx.example.test",
+            username="intbrainlab",
+            password="international",
+            download_dir=tmp_path,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    client.list_labs()
+
+    result = client.download_url("https://objects.example.test/data.npy", filename="data.npy")
+
+    assert result["bytes"] == 5
+    assert seen["authorization"] is None
 
 
 def test_download_url_rejects_path_traversal(tmp_path: Path) -> None:
