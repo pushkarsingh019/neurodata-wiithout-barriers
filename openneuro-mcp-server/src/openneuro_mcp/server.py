@@ -7,6 +7,7 @@ from mcp.server.fastmcp import FastMCP
 
 from openneuro_mcp import __version__
 from openneuro_mcp.client import DEFAULT_GRAPHQL_URL, DEFAULT_RAW_DATASET_URL, OpenNeuroClient, OpenNeuroClientConfig
+from openneuro_mcp.local_explorer import LocalOpenNeuroExplorer
 from openneuro_mcp.service import OpenNeuroSemanticService
 
 
@@ -22,11 +23,78 @@ def build_server() -> FastMCP:
         json_response=True,
     )
     service = OpenNeuroSemanticService(_client_from_env())
+    local = LocalOpenNeuroExplorer(service.storage)
 
     @mcp.tool()
     def get_storage_info() -> dict[str, Any]:
         """Return the standardized local storage paths and schema for this MCP server."""
         return service.storage.describe()
+
+    @mcp.tool()
+    def register_local_dataset(path: str | None = None, dataset_id: str | None = None, tag: str = "local") -> dict[str, Any]:
+        """Register a downloaded local OpenNeuro/BIDS dataset by path or dataset id."""
+        return local.register(path=path, dataset_id=dataset_id, tag=tag)
+
+    @mcp.tool()
+    def list_local_datasets() -> dict[str, Any]:
+        """List downloaded OpenNeuro/BIDS datasets registered with the local explorer."""
+        return local.list_registered()
+
+    @mcp.tool()
+    def summarize_local_dataset(dataset_key: str = "") -> dict[str, Any]:
+        """Summarize a registered local BIDS dataset, including subjects, tasks, modalities, and events."""
+        return local.summarize(dataset_key)
+
+    @mcp.tool()
+    def browse_local_dataset(dataset_key: str = "", path_prefix: str = "") -> dict[str, Any]:
+        """Browse direct child files and folders inside a registered local BIDS dataset."""
+        return local.browse(dataset_key, path_prefix=path_prefix)
+
+    @mcp.tool()
+    def list_local_files(
+        dataset_key: str = "",
+        glob: str | None = None,
+        file_type: str | None = None,
+        subject: str | None = None,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        """List local BIDS files with optional glob, type, and subject filters."""
+        return local.list_files(dataset_key, glob=glob, file_type=file_type, subject=subject, limit=limit)
+
+    @mcp.tool()
+    def index_local_dataset(dataset_key: str = "") -> dict[str, Any]:
+        """Build a local BIDS index over subjects, sessions, tasks, events, and modality inventory."""
+        return local.index(dataset_key)
+
+    @mcp.tool()
+    def get_dataset_subjects(dataset_key: str = "") -> dict[str, Any]:
+        """Return detected subjects for a registered local OpenNeuro dataset."""
+        return local.subjects(dataset_key)
+
+    @mcp.tool()
+    def get_dataset_sessions(dataset_key: str = "") -> dict[str, Any]:
+        """Return detected sessions for a registered local OpenNeuro dataset."""
+        return local.sessions(dataset_key)
+
+    @mcp.tool()
+    def get_dataset_signal_inventory(dataset_key: str = "") -> dict[str, Any]:
+        """Return local BIDS signal/file inventory with modality, suffix, task, and subject fields."""
+        return local.signal_inventory(dataset_key)
+
+    @mcp.tool()
+    def extract_events_table(
+        dataset_key: str = "",
+        path: str = "",
+        task: str | None = None,
+        limit: int = 1000,
+    ) -> dict[str, Any]:
+        """Extract a bounded preview of a local BIDS events.tsv file."""
+        return local.extract_events(dataset_key, path=path, task=task, limit=limit)
+
+    @mcp.tool()
+    def generate_dataset_report(dataset_key: str = "") -> dict[str, Any]:
+        """Generate a Markdown local dataset report under MCP artifact storage."""
+        return local.report(dataset_key)
 
     @mcp.tool()
     def search_datasets(query: str | None = None, page_size: int = 25, after: str | None = None) -> dict[str, Any]:

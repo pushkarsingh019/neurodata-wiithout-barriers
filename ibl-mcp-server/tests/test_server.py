@@ -10,6 +10,12 @@ def test_server_exposes_rich_ibl_tool_surface() -> None:
 
     expected = {
         "get_storage_info",
+        "register_local_dataset",
+        "summarize_local_dataset",
+        "browse_local_dataset",
+        "index_local_dataset",
+        "get_dataset_signal_inventory",
+        "generate_dataset_report",
         "list_alyx_endpoints",
         "describe_alyx_endpoint",
         "search_sessions",

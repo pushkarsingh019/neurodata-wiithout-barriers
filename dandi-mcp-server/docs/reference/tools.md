@@ -15,6 +15,29 @@
 | `find_similar_datasets` | Find datasets similar to a source Dandiset using inferred neuroscience profile terms. |
 | `find_behavioral_paradigms` | Find candidate datasets with behavioral task, paradigm, trial, stimulus, or reward hints. |
 
+## Local Dataset Explorer
+
+| Tool | Purpose |
+|---|---|
+| `register_local_dandiset` | Register a downloaded Dandiset by local path, or by DANDI id when it can be found in configured local roots. |
+| `register_local_dataset` | Provider-compatible alias for registering a downloaded local DANDI dataset. |
+| `list_local_dandisets` | List registered local Dandisets and their scan status. |
+| `list_local_datasets` | Provider-compatible alias for listing registered local DANDI datasets. |
+| `summarize_local_dandiset` | Summarize local files, metadata, subjects, modalities, NWB count, and index status. |
+| `summarize_local_dataset` | Provider-compatible alias for summarizing a registered local DANDI dataset. |
+| `browse_local_dandiset` | Browse direct child files and folders in a local Dandiset. |
+| `browse_local_dataset` | Provider-compatible alias for browsing a registered local DANDI dataset. |
+| `list_local_files` | Filter local files by glob, file type, subject, and limit. |
+| `inspect_nwb_file` | Lazily inspect a local NWB file for subject/session metadata, modules, tables, intervals, and time series. |
+| `validate_nwb_file` | Run NWBInspector on a local NWB file and return bounded validation messages. |
+| `index_local_dandiset` | Build a cross-file subject, session, modality, trial, unit, signal, and validation index from local NWB files. |
+| `index_local_dataset` | Provider-compatible alias for indexing a registered local DANDI dataset. |
+| `get_dataset_subjects` | Return detected subjects from the local dataset index. |
+| `get_dataset_sessions` | Return detected sessions or file-level session stand-ins from the local dataset index. |
+| `get_dataset_signal_inventory` | Return local NWB signal object paths, shapes, rates, and units for analysis planning. |
+| `extract_trials_table` | Extract a bounded preview of a local NWB trials table when present. |
+| `generate_dataset_report` | Generate a Markdown report under MCP artifact storage. |
+
 ## Neuroscience Intelligence
 
 | Tool | Purpose |

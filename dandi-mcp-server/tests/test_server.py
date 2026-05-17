@@ -10,6 +10,18 @@ def test_server_exposes_broad_dandi_tool_surface() -> None:
 
     expected = {
         "get_storage_info",
+        "register_local_dandiset",
+        "register_local_dataset",
+        "summarize_local_dandiset",
+        "summarize_local_dataset",
+        "browse_local_dandiset",
+        "browse_local_dataset",
+        "inspect_nwb_file",
+        "index_local_dandiset",
+        "index_local_dataset",
+        "get_dataset_signal_inventory",
+        "extract_trials_table",
+        "generate_dataset_report",
         "search_dandisets",
         "get_dandiset",
         "list_dandiset_versions",

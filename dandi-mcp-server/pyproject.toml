@@ -8,13 +8,22 @@ authors = [{ name = "Paper Lineage CLI contributors" }]
 dependencies = [
   "httpx>=0.27.0",
   "mcp[cli]>=1.27.0",
+  "PyYAML>=6.0.0",
 ]
 
 [project.optional-dependencies]
+analysis = [
+  "h5py>=3.10.0",
+  "nwbinspector>=0.6.0",
+  "pynwb>=2.8.0",
+]
 dev = [
   "mkdocs>=1.6.0",
   "mkdocs-material>=9.5.0",
   "pytest>=8.0.0",
+  "h5py>=3.10.0",
+  "nwbinspector>=0.6.0",
+  "pynwb>=2.8.0",
 ]
 
 [project.scripts]

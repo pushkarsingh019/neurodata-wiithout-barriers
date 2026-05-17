@@ -13,6 +13,7 @@ from ibl_mcp.client import (
     IBLClient,
     IBLClientConfig,
 )
+from ibl_mcp.local_explorer import LocalIBLExplorer
 from ibl_mcp.services import IBLDomainService
 from ibl_mcp.storage import MCPStorage
 
@@ -31,11 +32,72 @@ def build_server() -> FastMCP:
     )
     client = _client_from_env()
     service = IBLDomainService(client)
+    local = LocalIBLExplorer(client.storage)
 
     @mcp.tool()
     def get_storage_info() -> dict[str, Any]:
         """Return the standardized local storage paths and schema for this MCP server."""
         return client.storage.describe()
+
+    @mcp.tool()
+    def register_local_dataset(
+        path: str | None = None,
+        session_id: str | None = None,
+        dataset_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Register a downloaded local IBL/ALF dataset by path, session id, or dataset id."""
+        return local.register(path=path, session_id=session_id, dataset_id=dataset_id)
+
+    @mcp.tool()
+    def list_local_datasets() -> dict[str, Any]:
+        """List downloaded IBL datasets registered with the local explorer."""
+        return local.list_registered()
+
+    @mcp.tool()
+    def summarize_local_dataset(dataset_key: str = "") -> dict[str, Any]:
+        """Summarize a registered local IBL dataset, including collections, ALF objects, and modalities."""
+        return local.summarize(dataset_key)
+
+    @mcp.tool()
+    def browse_local_dataset(dataset_key: str = "", path_prefix: str = "") -> dict[str, Any]:
+        """Browse direct child files and folders inside a registered local IBL dataset."""
+        return local.browse(dataset_key, path_prefix=path_prefix)
+
+    @mcp.tool()
+    def list_local_files(
+        dataset_key: str = "",
+        glob: str | None = None,
+        file_type: str | None = None,
+        subject: str | None = None,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        """List local IBL files with optional glob, type, and subject filters."""
+        return local.list_files(dataset_key, glob=glob, file_type=file_type, subject=subject, limit=limit)
+
+    @mcp.tool()
+    def index_local_dataset(dataset_key: str = "") -> dict[str, Any]:
+        """Build a local IBL index over subjects, sessions, collections, ALF objects, and modalities."""
+        return local.index(dataset_key)
+
+    @mcp.tool()
+    def get_dataset_subjects(dataset_key: str = "") -> dict[str, Any]:
+        """Return detected subjects for a registered local IBL dataset."""
+        return local.subjects(dataset_key)
+
+    @mcp.tool()
+    def get_dataset_sessions(dataset_key: str = "") -> dict[str, Any]:
+        """Return detected sessions for a registered local IBL dataset."""
+        return local.sessions(dataset_key)
+
+    @mcp.tool()
+    def get_dataset_signal_inventory(dataset_key: str = "") -> dict[str, Any]:
+        """Return local IBL signal inventory with collection, ALF object, attribute, and modality fields."""
+        return local.signal_inventory(dataset_key)
+
+    @mcp.tool()
+    def generate_dataset_report(dataset_key: str = "") -> dict[str, Any]:
+        """Generate a Markdown local IBL dataset report under MCP artifact storage."""
+        return local.report(dataset_key)
 
     @mcp.tool()
     def list_alyx_endpoints() -> dict[str, Any]:

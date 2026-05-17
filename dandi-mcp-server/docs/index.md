@@ -10,6 +10,7 @@ The server is designed for research agents that need to discover neurophysiology
 |---|---|
 | Dandisets | Search, inspect metadata, list versions, summarize scientific context. |
 | Assets | Browse paths, filter assets, inspect metadata/info/validation, resolve download URLs. |
+| Local explorer | Register downloaded Dandisets, scan local files, inspect NWB metadata, build dataset indexes, extract trial previews, and generate reports. |
 | Archive metadata | Inspect service info, statistics, available schemas, and schema models. |
 | Zarr | List Zarr archives, inspect Zarr metadata, list Zarr files, optionally request download URLs. |
 | Users and auth | Read current user/token state, list/search users where allowed by DANDI. |
@@ -23,5 +24,4 @@ Read-only tools work directly. Authenticated reads may require `DANDI_API_TOKEN`
 Mutating tools are intentionally blocked until called with `confirm=true`. This includes creating, updating, deleting, publishing, uploads, starring, and Zarr mutation. The universal `call_dandi_api` fallback also blocks non-GET methods unless `allow_mutation=true`.
 
 !!! note
-    This MCP server wraps the DANDI API. It does not parse NWB, BIDS, or Zarr payload contents locally yet. It helps agents discover and reason about datasets before deciding whether a large asset download is worthwhile.
-
+    The archive-facing tools wrap the DANDI API. The local explorer tools inspect downloaded NWB files with PyNWB/NWBInspector when those optional analysis dependencies are installed. They read metadata lazily and avoid loading full arrays by default.

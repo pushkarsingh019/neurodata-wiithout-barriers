@@ -26,3 +26,19 @@
 | `get_dataset_embedding` | Dataset embedding vector |
 | `query_knowledge_graph` | Graph traversal over indexed entities |
 | `get_openneuro_mcp_roadmap` | Architecture and integration roadmap |
+
+## Local Dataset Explorer
+
+| Tool | Purpose |
+| --- | --- |
+| `register_local_dataset` | Register a downloaded local OpenNeuro/BIDS dataset by path or dataset id |
+| `list_local_datasets` | List registered local OpenNeuro/BIDS datasets |
+| `summarize_local_dataset` | Summarize local files, subjects, sessions, tasks, modalities, participants, and events |
+| `browse_local_dataset` | Browse direct child files and folders inside a local dataset |
+| `list_local_files` | Filter local BIDS files by glob, file type, subject, and limit |
+| `index_local_dataset` | Build a local BIDS index over subjects, sessions, tasks, events, and modality inventory |
+| `get_dataset_subjects` | Return detected subjects from the local index |
+| `get_dataset_sessions` | Return detected sessions from the local index |
+| `get_dataset_signal_inventory` | Return local file/signal inventory with modality, suffix, task, and subject fields |
+| `extract_events_table` | Extract a bounded preview of a local `events.tsv` file |
+| `generate_dataset_report` | Generate a Markdown report under MCP artifact storage |

@@ -56,11 +56,15 @@ uv run mcp dev src/ibl_mcp/server.py
 | `IBL_ALYX_TOKEN` | Optional Alyx token for authenticated servers. |
 | `IBL_ALYX_USERNAME`, `IBL_ALYX_PASSWORD` | Alyx credentials used to mint a token when `IBL_ALYX_TOKEN` is absent. Defaults to the documented public OpenAlyx account: `intbrainlab` / `international`. |
 | `IBL_MCP_DOWNLOAD_DIR` | Directory for `download_url`. Defaults to `~/.cache/ibl-mcp/downloads`. |
+| `IBL_MCP_DATA_ROOTS` | Optional `:`-separated local roots searched by `register_local_dataset` when only a session or dataset id is supplied. |
 
 ## Tools
 
 | Tool | Purpose |
 |---|---|
+| `register_local_dataset`, `list_local_datasets`, `summarize_local_dataset` | Register and summarize downloaded local IBL/ALF-style datasets. |
+| `browse_local_dataset`, `list_local_files`, `index_local_dataset` | Browse local files and build a local subject/session/collection/ALF-object index. |
+| `get_dataset_subjects`, `get_dataset_sessions`, `get_dataset_signal_inventory`, `generate_dataset_report` | Inspect local dataset structure and generate a Markdown report under MCP artifact storage. |
 | `list_alyx_endpoints` | List the live Alyx endpoint surface. |
 | `describe_alyx_endpoint` | Fetch OPTIONS/schema metadata for an endpoint. |
 | `search_sessions` | Search IBL sessions by subject, lab, project, protocol, date range, datasets, brain region, QC, or Django lookups. |

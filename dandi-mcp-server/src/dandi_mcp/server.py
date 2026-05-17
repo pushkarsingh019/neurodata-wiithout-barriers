@@ -7,6 +7,7 @@ from mcp.server.fastmcp import FastMCP
 
 from dandi_mcp import __version__
 from dandi_mcp.client import DEFAULT_API_BASE_URL, DandiClient, DandiClientConfig
+from dandi_mcp.local_explorer import LocalDandisetExplorer
 
 
 def build_server() -> FastMCP:
@@ -21,11 +22,122 @@ def build_server() -> FastMCP:
         json_response=True,
     )
     client = _client_from_env()
+    local = LocalDandisetExplorer(client.storage)
 
     @mcp.tool()
     def get_storage_info() -> dict[str, Any]:
         """Return the standardized local storage paths and schema for this MCP server."""
         return client.storage.describe()
+
+    @mcp.tool()
+    def register_local_dandiset(
+        path: str | None = None,
+        dandiset_id: str | None = None,
+        version: str | None = None,
+    ) -> dict[str, Any]:
+        """Register a downloaded local Dandiset by path or by DANDI id if it can be found locally."""
+        return local.register(path=path, dandiset_id=dandiset_id, version=version)
+
+    @mcp.tool()
+    def register_local_dataset(
+        path: str | None = None,
+        dataset_id: str | None = None,
+        version: str | None = None,
+    ) -> dict[str, Any]:
+        """Provider-compatible alias for registering a downloaded local DANDI dataset."""
+        return local.register(path=path, dandiset_id=dataset_id, version=version)
+
+    @mcp.tool()
+    def list_local_dandisets() -> dict[str, Any]:
+        """List downloaded Dandisets registered with the local analysis engine."""
+        return local.list_registered()
+
+    @mcp.tool()
+    def list_local_datasets() -> dict[str, Any]:
+        """Provider-compatible alias for listing registered downloaded DANDI datasets."""
+        return local.list_registered()
+
+    @mcp.tool()
+    def summarize_local_dandiset(dataset_key: str = "") -> dict[str, Any]:
+        """Summarize a registered local Dandiset, including file types, subjects, and index status."""
+        return local.summarize(dataset_key)
+
+    @mcp.tool()
+    def summarize_local_dataset(dataset_key: str = "") -> dict[str, Any]:
+        """Provider-compatible alias for summarizing a registered local DANDI dataset."""
+        return local.summarize(dataset_key)
+
+    @mcp.tool()
+    def browse_local_dandiset(dataset_key: str = "", path_prefix: str = "") -> dict[str, Any]:
+        """Browse direct child files and folders inside a registered local Dandiset."""
+        return local.browse(dataset_key, path_prefix=path_prefix)
+
+    @mcp.tool()
+    def browse_local_dataset(dataset_key: str = "", path_prefix: str = "") -> dict[str, Any]:
+        """Provider-compatible alias for browsing a registered local DANDI dataset."""
+        return local.browse(dataset_key, path_prefix=path_prefix)
+
+    @mcp.tool()
+    def list_local_files(
+        dataset_key: str = "",
+        glob: str | None = None,
+        file_type: str | None = None,
+        subject: str | None = None,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        """List local Dandiset files with optional glob, type, and subject filters."""
+        return local.list_files(
+            dataset_key,
+            glob=glob,
+            file_type=file_type,
+            subject=subject,
+            limit=limit,
+        )
+
+    @mcp.tool()
+    def inspect_nwb_file(dataset_key: str = "", path: str = "") -> dict[str, Any]:
+        """Lazily inspect a local NWB file and summarize subjects, modules, tables, and signals."""
+        return local.inspect_nwb(dataset_key, path)
+
+    @mcp.tool()
+    def validate_nwb_file(dataset_key: str = "", path: str = "", limit: int = 100) -> dict[str, Any]:
+        """Run NWBInspector on a local NWB file and return bounded validation messages."""
+        return local.validate_nwb(dataset_key, path, limit=limit)
+
+    @mcp.tool()
+    def index_local_dandiset(dataset_key: str = "", inspect_limit: int = 100) -> dict[str, Any]:
+        """Inspect local NWB files and build a cross-file subject/session/signal/trial index."""
+        return local.index(dataset_key, inspect_limit=inspect_limit)
+
+    @mcp.tool()
+    def index_local_dataset(dataset_key: str = "", inspect_limit: int = 100) -> dict[str, Any]:
+        """Provider-compatible alias for indexing a registered local DANDI dataset."""
+        return local.index(dataset_key, inspect_limit=inspect_limit)
+
+    @mcp.tool()
+    def get_dataset_subjects(dataset_key: str = "") -> dict[str, Any]:
+        """Return detected subjects for a registered local Dandiset."""
+        return local.subjects(dataset_key)
+
+    @mcp.tool()
+    def get_dataset_sessions(dataset_key: str = "") -> dict[str, Any]:
+        """Return detected sessions/files for a registered local Dandiset."""
+        return local.sessions(dataset_key)
+
+    @mcp.tool()
+    def get_dataset_signal_inventory(dataset_key: str = "") -> dict[str, Any]:
+        """Return analysis-ready local NWB signal inventory with object paths, shapes, rates, and units."""
+        return local.signal_inventory(dataset_key)
+
+    @mcp.tool()
+    def extract_trials_table(dataset_key: str = "", path: str = "", limit: int = 1000) -> dict[str, Any]:
+        """Extract a bounded preview of a local NWB trials table, when present."""
+        return local.extract_trials(dataset_key, path, limit=limit)
+
+    @mcp.tool()
+    def generate_dataset_report(dataset_key: str = "") -> dict[str, Any]:
+        """Generate a Markdown report for a registered local Dandiset under MCP artifact storage."""
+        return local.report(dataset_key)
 
     @mcp.tool()
     def search_dandisets(
