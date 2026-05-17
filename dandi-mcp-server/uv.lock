@@ -509,8 +509,11 @@ name = "dandi-mcp-server"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "h5py" },
     { name = "httpx" },
     { name = "mcp", extra = ["cli"] },
+    { name = "nwbinspector" },
+    { name = "pynwb" },
     { name = "pypdf" },
     { name = "pyyaml" },
 ]
@@ -532,14 +535,17 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "h5py", specifier = ">=3.10.0" },
     { name = "h5py", marker = "extra == 'analysis'", specifier = ">=3.10.0" },
     { name = "h5py", marker = "extra == 'dev'", specifier = ">=3.10.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.27.0" },
     { name = "mkdocs", marker = "extra == 'dev'", specifier = ">=1.6.0" },
     { name = "mkdocs-material", marker = "extra == 'dev'", specifier = ">=9.5.0" },
+    { name = "nwbinspector", specifier = ">=0.6.0" },
     { name = "nwbinspector", marker = "extra == 'analysis'", specifier = ">=0.6.0" },
     { name = "nwbinspector", marker = "extra == 'dev'", specifier = ">=0.6.0" },
+    { name = "pynwb", specifier = ">=2.8.0" },
     { name = "pynwb", marker = "extra == 'analysis'", specifier = ">=2.8.0" },
     { name = "pynwb", marker = "extra == 'dev'", specifier = ">=2.8.0" },
     { name = "pypdf", specifier = ">=6.10.0" },

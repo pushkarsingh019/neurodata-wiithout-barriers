@@ -761,6 +761,11 @@ def build_server() -> FastMCP:
             "explorer_id": explorer_id,
             "dataset_key_or_id": dataset_key_or_id,
             "html_path": str(html_path),
+            "open_command": f"open {html_path}",
+            "agent_instruction": (
+                "Open html_path for the user when they ask to visualize or explore the dataset. "
+                "Use plotting only when the user explicitly asks for a plot or analysis figure."
+            ),
             "summary": {
                 "variable_count": len(variables),
                 "paper_count": len(papers),
@@ -1023,15 +1028,148 @@ def _dandi_explorer_data(
     version: str,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     summary = _safe_call(lambda: local.summarize(dataset_key_or_id), default={})
-    variables = []
+    variables: list[dict[str, Any]] = []
     inventory = _safe_call(lambda: local.signal_inventory(dataset_key_or_id), default={})
     for signal in inventory.get("signals", []) if isinstance(inventory, dict) else []:
         variables.append({"provider": "dandi", "confidence_label": "low", **signal})
+    if summary and not variables:
+        index = _safe_call(lambda: local.index(dataset_key_or_id), default={})
+        variables.extend(_variables_from_local_index(index))
+    if summary and not variables:
+        for file_record in summary.get("sample_files") or []:
+            if file_record.get("file_type") == "nwb":
+                variables.append(
+                    {
+                        "provider": "dandi",
+                        "name": file_record.get("path"),
+                        "file": file_record.get("path"),
+                        "file_path": file_record.get("path"),
+                        "kind": "nwb_file",
+                        "subject": file_record.get("subject"),
+                        "session": file_record.get("session"),
+                        "modality": file_record.get("modality"),
+                        "confidence_label": "low",
+                        "status": "file_known_nwb_not_indexed",
+                    }
+                )
     if not summary:
-        summary = _safe_call(lambda: client.summarize_dandiset(dataset_key_or_id, version), default={"name": dataset_key_or_id})
-        for item in summary.get("variableMeasured") or []:
-            variables.append({"provider": "dandi", "name": str(item), "kind": "metadata_variable", "confidence_label": "low"})
-    return summary, variables
+        summary = _safe_call(
+            lambda: client.summarize_dandiset(dataset_key_or_id, version),
+            default={"name": dataset_key_or_id},
+        )
+    variables.extend(_variables_from_remote_dandi_summary(summary))
+    return summary, _dedupe_variables(variables)
+
+
+def _variables_from_local_index(index: dict[str, Any]) -> list[dict[str, Any]]:
+    variables: list[dict[str, Any]] = []
+    for signal in index.get("signal_inventory", []) if isinstance(index, dict) else []:
+        variables.append({"provider": "dandi", "confidence_label": "medium", **signal})
+    for summary in index.get("nwb_summaries", []) if isinstance(index, dict) else []:
+        file_path = summary.get("relative_path") or summary.get("path")
+        if summary.get("status") == "dependency_missing" and file_path:
+            variables.append(
+                {
+                    "provider": "dandi",
+                    "name": file_path,
+                    "file": file_path,
+                    "file_path": file_path,
+                    "kind": "nwb_file",
+                    "status": "dependency_missing",
+                    "message": summary.get("message"),
+                    "confidence_label": "low",
+                }
+            )
+            continue
+        for interface in summary.get("processing", []):
+            module_name = interface.get("name")
+            for child in interface.get("interfaces", []):
+                variables.append(
+                    {
+                        "provider": "dandi",
+                        "name": child.get("name"),
+                        "file": file_path,
+                        "file_path": file_path,
+                        "object_path": child.get("object_path"),
+                        "kind": "nwb_processing_interface",
+                        "modality": module_name,
+                        "neurodata_type": child.get("neurodata_type"),
+                        "description": child.get("description"),
+                        "confidence_label": "medium",
+                    }
+                )
+    return variables
+
+
+def _variables_from_remote_dandi_summary(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    variables: list[dict[str, Any]] = []
+    for item in summary.get("variableMeasured") or []:
+        value = item.get("value") if isinstance(item, dict) else item
+        if value:
+            variables.append(
+                {
+                    "provider": "dandi",
+                    "name": str(value),
+                    "kind": "metadata_variable",
+                    "confidence_label": "low",
+                    "source": "dandiset_metadata",
+                }
+            )
+    for asset in (summary.get("assets") or {}).get("sample", []):
+        path = asset.get("path")
+        metadata = asset.get("metadata") or {}
+        if path:
+            variables.append(
+                {
+                    "provider": "dandi",
+                    "name": path,
+                    "file": path,
+                    "file_path": path,
+                    "kind": metadata.get("encodingFormat") or "asset",
+                    "subject": _participant_identifier(metadata),
+                    "object_path": path,
+                    "confidence_label": "low",
+                    "status": "remote_asset_metadata_only",
+                }
+            )
+        for item in metadata.get("variableMeasured") or []:
+            value = item.get("value") if isinstance(item, dict) else item
+            if value:
+                variables.append(
+                    {
+                        "provider": "dandi",
+                        "name": str(value),
+                        "file": path,
+                        "file_path": path,
+                        "kind": "asset_metadata_variable",
+                        "confidence_label": "low",
+                        "source": "asset_metadata",
+                    }
+                )
+    return variables
+
+
+def _participant_identifier(metadata: dict[str, Any]) -> str | None:
+    for item in metadata.get("wasAttributedTo") or []:
+        if isinstance(item, dict) and item.get("schemaKey") == "Participant":
+            return item.get("identifier")
+    return None
+
+
+def _dedupe_variables(variables: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[tuple[str, str, str]] = set()
+    deduped = []
+    for variable in variables:
+        key = (
+            str(variable.get("name") or ""),
+            str(variable.get("file") or variable.get("file_path") or ""),
+            str(variable.get("object_path") or ""),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(variable)
+    return deduped
 
 
 mcp = build_server()
