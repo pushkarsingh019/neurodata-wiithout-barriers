@@ -110,6 +110,12 @@ function Landing({ onNavigate, health }: { onNavigate: (datasetId: string) => vo
   const [value, setValue] = useState("");
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const llmLabel =
+    health?.llm.status === "ready"
+      ? health.llm.model
+      : health?.llm.base_url
+        ? `checking ${health.llm.base_url}`
+        : "not configured";
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -153,7 +159,7 @@ function Landing({ onNavigate, health }: { onNavigate: (datasetId: string) => vo
             <span>Open DANDI example 001097</span>
           </button>
           <div className="quiet-note">
-            LLM: {health?.llm.status === "ready" ? health.llm.model : "checking http://100.67.104.58:8001/v1"}
+            LLM: {llmLabel}
           </div>
         </div>
       </section>

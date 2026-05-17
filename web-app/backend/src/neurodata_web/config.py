@@ -23,7 +23,7 @@ def load_config() -> AppConfig:
     return AppConfig(
         host=os.environ.get("HOST", "0.0.0.0"),
         port=int(os.environ.get("PORT", os.environ.get("NEURODATA_WEB_PORT", "8787"))),
-        llm_base_url=os.environ.get("NEURODATA_LLM_BASE_URL", "http://100.67.104.58:8001/v1").rstrip("/"),
+        llm_base_url=os.environ.get("NEURODATA_LLM_BASE_URL", "").rstrip("/"),
         llm_model=os.environ.get("NEURODATA_LLM_MODEL") or None,
         llm_timeout=float(os.environ.get("NEURODATA_LLM_TIMEOUT", "90")),
         dandi_api_base_url=os.environ.get("DANDI_API_BASE_URL", "https://api.dandiarchive.org/api"),

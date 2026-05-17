@@ -24,6 +24,12 @@ class LocalLLMClient:
         self.config = config
 
     def health(self) -> dict[str, Any]:
+        if not self.config.llm_base_url:
+            return {
+                "status": "unavailable",
+                "base_url": "",
+                "error": "NEURODATA_LLM_BASE_URL is not configured.",
+            }
         try:
             with httpx.Client(timeout=5) as client:
                 response = client.get(f"{self.config.llm_base_url}/models")
@@ -123,6 +129,8 @@ class LocalLLMClient:
         return LLMResult(text=text.strip(), model=model, route="completions")
 
     def _resolve_model(self) -> str:
+        if not self.config.llm_base_url:
+            raise LocalLLMUnavailable("NEURODATA_LLM_BASE_URL is not configured.")
         if self.config.llm_model:
             return self.config.llm_model
         try:

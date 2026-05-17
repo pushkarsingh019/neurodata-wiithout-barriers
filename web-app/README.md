@@ -29,6 +29,16 @@ NEURODATA_MCP_STORAGE_DIR=/data/.mcp-storage
 
 For split hosting, build the frontend with `VITE_API_BASE_URL=https://your-api-host` and set `NEURODATA_CORS_ORIGINS` on the backend to the frontend origin.
 
+## Vercel
+
+The repository root includes `vercel.json` and `api/index.py`, so the app can be deployed from the root with:
+
+```bash
+npx vercel --prod
+```
+
+Vercel builds `web-app/frontend`, serves the generated static files, and routes `/api/*` to the FastAPI backend. Runtime caches use `/tmp` on Vercel, so local Dandiset path indexing is best used in local or Docker deployments.
+
 ## Local Development
 
 Start the API:

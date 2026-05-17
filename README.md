@@ -28,6 +28,14 @@ docker compose -f docker-compose.web.yml up --build
 
 Open `http://127.0.0.1:8787`, paste a DANDI ID or URL, and explore the dataset. Optional runtime overrides live in [web-app/.env.example](web-app/.env.example).
 
+Deploy the web app to Vercel:
+
+```bash
+npx vercel --prod
+```
+
+The Vercel deployment uses [vercel.json](vercel.json), builds the Vite app from `web-app/frontend`, serves the static frontend, and routes `/api/*` to the FastAPI app in [api/index.py](api/index.py). Local filesystem indexing is still intended for local/Docker runs; Vercel should be treated as the public metadata and documentation host unless you attach external storage.
+
 Generate MCP client configuration for the server suite:
 
 ```bash
