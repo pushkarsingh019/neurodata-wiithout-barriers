@@ -9,6 +9,7 @@ This repository collects Model Context Protocol servers for neuroscience data di
 | `dandi-mcp-server` | MCP server for exploring DANDI Archive dandisets, assets, metadata, and download URLs. |
 | `ibl-mcp-server` | MCP server for International Brain Laboratory OpenAlyx data discovery and inspection. |
 | `openneuro-mcp-server` | MCP server for semantic discovery and BIDS-aware reasoning over OpenNeuro datasets. |
+| `web-app` | React + FastAPI web app for exploring DANDI datasets from a browser. |
 
 Each project has its own `README.md`, `pyproject.toml`, tests, and runtime entry point.
 
@@ -25,6 +26,17 @@ Run tests from an individual project directory:
 ```bash
 uv run pytest
 ```
+
+## Web App Hosting
+
+The web app is designed to run without committing local datasets or generated outputs. Build and serve the frontend and backend together with Docker:
+
+```bash
+cp web-app/.env.example web-app/.env
+docker compose -f docker-compose.web.yml up --build
+```
+
+Open `http://127.0.0.1:8787`. See [web-app/README.md](web-app/README.md) for environment variables, split frontend/backend hosting, and local development.
 
 ## MCP Harness
 

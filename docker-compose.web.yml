@@ -1,0 +1,19 @@
+services:
+  neurodata-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8787}:8787"
+    env_file:
+      - path: web-app/.env
+        required: false
+    environment:
+      PORT: 8787
+      NEURODATA_MCP_STORAGE_DIR: /data/.mcp-storage
+    volumes:
+      - neurodata-web-storage:/data
+    restart: unless-stopped
+
+volumes:
+  neurodata-web-storage:

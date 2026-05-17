@@ -20,9 +20,20 @@ venv/
 env/
 .uv-cache/
 .mcp-storage/
+node_modules/
+*.tsbuildinfo
+
+# Local datasets and generated demos
+*.nwb
+001097/
+figures/
+harness/generated/
+harness/render_terminal_video.py
+session-*.md
 
 # Generated docs
 site/
+web-app/frontend/dist/
 
 # Local editor and OS files
 .idea/
