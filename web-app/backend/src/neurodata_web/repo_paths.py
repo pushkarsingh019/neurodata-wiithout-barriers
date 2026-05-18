@@ -9,10 +9,11 @@ def ensure_repo_imports() -> Path:
     repo_root = backend_src.parents[4]
     paths = [
         repo_root / "dandi-mcp-server" / "src",
+        repo_root / "openneuro-mcp-server" / "src",
+        repo_root / "ibl-mcp-server" / "src",
     ]
     for path in paths:
         value = str(path)
         if value not in sys.path:
             sys.path.insert(0, value)
     return repo_root
-

@@ -4,20 +4,22 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+Provider = Literal["dandi", "openneuro", "ibl"]
+
 
 class DatasetResolveRequest(BaseModel):
     value: str = Field(..., min_length=1)
 
 
 class DatasetResolveResponse(BaseModel):
-    provider: Literal["dandi"]
+    provider: Provider
     dataset_id: str
     route: str
     source: str
 
 
 class DatasetPage(BaseModel):
-    provider: Literal["dandi"] = "dandi"
+    provider: Provider = "dandi"
     dataset_id: str
     version: str = "draft"
     route: str
@@ -31,8 +33,9 @@ class DatasetPage(BaseModel):
 
 
 class VariableInventory(BaseModel):
+    provider: Provider = "dandi"
     dataset_id: str
-    source: Literal["local_index", "metadata"]
+    source: Literal["local_index", "metadata", "archive"]
     local_index_status: Literal["indexed", "not_indexed", "missing_dependency", "error"]
     variables: list[dict[str, Any]]
     message: str | None = None
@@ -47,12 +50,14 @@ class VariableExplainRequest(BaseModel):
 
 
 class VariableExplainResponse(BaseModel):
+    provider: Provider = "dandi"
     dataset_id: str
     variable: str
     loading_code: str
     explanation: str | None
     evidence: list[dict[str, Any]]
     context: dict[str, Any]
+    preview: dict[str, Any] | None = None
     confidence_label: str = "unknown"
     ai_status: Literal["ready", "unavailable", "error"] = "ready"
     ai_error: str | None = None
@@ -83,3 +88,17 @@ class DownloadSampleResponse(BaseModel):
     downloads: list[dict[str, Any]] = Field(default_factory=list)
     message: str | None = None
 
+
+class SkillStatusResponse(BaseModel):
+    provider: Provider = "dandi"
+    dataset_id: str
+    ready: bool
+    total_variables: int
+    cached_variables: int
+    missing_variables: list[dict[str, Any]] = Field(default_factory=list)
+    message: str
+
+
+class SkillPrepareResponse(SkillStatusResponse):
+    generated_variables: int = 0
+    failed_variables: list[dict[str, Any]] = Field(default_factory=list)

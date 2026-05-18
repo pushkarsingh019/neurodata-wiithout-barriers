@@ -1,14 +1,15 @@
 export type AiStatus = "ready" | "unavailable" | "error";
+export type Provider = "dandi" | "openneuro" | "ibl";
 
 export interface DatasetResolveResponse {
-  provider: "dandi";
+  provider: Provider;
   dataset_id: string;
   route: string;
   source: string;
 }
 
 export interface DatasetPage {
-  provider: "dandi";
+  provider: Provider;
   dataset_id: string;
   version: string;
   route: string;
@@ -26,8 +27,9 @@ export interface DatasetPage {
 }
 
 export interface VariableInventory {
+  provider: Provider;
   dataset_id: string;
-  source: "local_index" | "metadata";
+  source: "local_index" | "metadata" | "archive";
   local_index_status: "indexed" | "not_indexed" | "missing_dependency" | "error";
   variables: VariableRecord[];
   message?: string | null;
@@ -53,15 +55,29 @@ export interface VariableRecord {
 }
 
 export interface VariableExplainResponse {
+  provider?: Provider;
   dataset_id: string;
   variable: string;
   loading_code: string;
   explanation?: string | null;
   evidence: Array<Record<string, unknown>>;
   context: Record<string, unknown>;
+  preview?: VariablePreview | null;
   confidence_label: string;
   ai_status: AiStatus;
   ai_error?: string | null;
+}
+
+export interface VariablePreview {
+  status?: string;
+  shape?: number[] | null;
+  rate?: number | string | null;
+  unit?: string | null;
+  neurodata_type?: string | null;
+  sample_axis?: string | null;
+  values?: number[];
+  intervals?: number[][];
+  message?: string | null;
 }
 
 export interface HealthResponse {
@@ -75,3 +91,14 @@ export interface HealthResponse {
   storage_dir: string;
 }
 
+export interface SkillStatus {
+  provider?: Provider;
+  dataset_id: string;
+  ready: boolean;
+  total_variables: number;
+  cached_variables: number;
+  missing_variables: Array<Record<string, unknown>>;
+  message: string;
+  generated_variables?: number;
+  failed_variables?: Array<Record<string, unknown>>;
+}

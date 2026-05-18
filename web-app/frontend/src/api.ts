@@ -2,6 +2,8 @@ import type {
   DatasetPage,
   DatasetResolveResponse,
   HealthResponse,
+  Provider,
+  SkillStatus,
   VariableExplainResponse,
   VariableInventory,
   VariableRecord
@@ -32,17 +34,17 @@ export function resolveDataset(value: string) {
   });
 }
 
-export function getDataset(datasetId: string) {
-  return request<DatasetPage>(`/api/dandi/${datasetId}`);
+export function getDataset(provider: Provider, datasetId: string) {
+  return request<DatasetPage>(`/api/${provider}/${encodeURIComponent(datasetId)}`);
 }
 
-export function getVariables(datasetId: string) {
-  return request<VariableInventory>(`/api/dandi/${datasetId}/variables`);
+export function getVariables(provider: Provider, datasetId: string) {
+  return request<VariableInventory>(`/api/${provider}/${encodeURIComponent(datasetId)}/variables`);
 }
 
-export function explainVariable(datasetId: string, variable: VariableRecord) {
+export function explainVariable(provider: Provider, datasetId: string, variable: VariableRecord) {
   const name = String(variable.name ?? variable.variable ?? variable.object_path ?? "variable");
-  return request<VariableExplainResponse>(`/api/dandi/${datasetId}/variables/explain`, {
+  return request<VariableExplainResponse>(`/api/${provider}/${encodeURIComponent(datasetId)}/variables/explain`, {
     method: "POST",
     body: JSON.stringify({
       variable: name,
@@ -52,13 +54,21 @@ export function explainVariable(datasetId: string, variable: VariableRecord) {
   });
 }
 
-export function indexLocal(datasetId: string, path: string) {
-  return request(`/api/dandi/${datasetId}/index-local`, {
+export function indexLocal(provider: Provider, datasetId: string, path: string) {
+  return request(`/api/${provider}/${encodeURIComponent(datasetId)}/index-local`, {
     method: "POST",
     body: JSON.stringify({ path, dandiset_id: datasetId, inspect_limit: 50 })
   });
 }
 
-export function skillUrl(datasetId: string) {
-  return `${API_BASE_URL}/api/dandi/${datasetId}/skill.zip`;
+export function skillUrl(provider: Provider, datasetId: string) {
+  return `${API_BASE_URL}/api/${provider}/${encodeURIComponent(datasetId)}/skill.zip`;
+}
+
+export function getSkillStatus(provider: Provider, datasetId: string) {
+  return request<SkillStatus>(`/api/${provider}/${encodeURIComponent(datasetId)}/skill-status`);
+}
+
+export function prepareSkill(provider: Provider, datasetId: string) {
+  return request<SkillStatus>(`/api/${provider}/${encodeURIComponent(datasetId)}/skill-prepare`, { method: "POST" });
 }
